@@ -17,26 +17,33 @@ impl ImageInputNode{
     pub fn new()->Self{
         ImageInputNode { location: "".to_string(), buffered: false, buffer: RgbaImage::default() }
     }
+
+}
+
+impl NodeStatic for ImageInputNode{
+
+    fn get_inputs_static()->Vec<NodeInputOptions>{
+        vec![NodeInputOptions{IOType:NodeIOType::StringType(crate::RESOURCE_PATH.clone() + r"images\" + "dummy2.png"), canAlterDefault:true,hasConnection:false, name:"path".to_string(), presetValues:None}]
+    }
+
+    fn get_outputs_static()->Vec<NodeOutputOptions>{
+        vec![NodeOutputOptions{IOType:NodeIOType::BitmapType(RgbaImage::default()), hasConnection:true, name:"bitmap".to_string()}]
+    }
+
+    fn get_node_name_static()->String{
+        "Image input".to_string()
+    }
 }
 
 impl Node for ImageInputNode{
 
-    fn get_node_name(&self)->String {
-        "Image Input".to_string()
-    }
+
     fn clear_buffers(&mut self) {
         self.buffered = false;
         self.buffer = RgbaImage::default();
         self.location = String::default();
     }
 
-    fn get_outputs(&self)->Vec<NodeOutputOptions> {
-        vec![NodeOutputOptions{IOType:NodeIOType::BitmapType(RgbaImage::default()), hasConnection:true, name:"bitmap".to_string()}]
-    }
-
-    fn get_inputs(&self)->Vec<NodeInputOptions> {
-        vec![NodeInputOptions{IOType:NodeIOType::StringType("dummy.png".to_string()), canAlterDefault:false,hasConnection:false, name:"".to_string(), presetValues:None}]
-    }
 
     
     fn set(&mut self, index: u16, value: NodeIOType) -> NodeResult<()> {

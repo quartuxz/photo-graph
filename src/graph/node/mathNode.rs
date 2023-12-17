@@ -13,29 +13,34 @@ impl MathNode{
     pub fn new()->Self{
         MathNode { operation:0,x: 0.0, y: 0.0, buffer: 0.0, buffered: false }
     }
+
+
+    
 }
 
-impl Node for MathNode{
-    fn get_node_name(&self)->String {
-        "Math".to_string()
-    }
-
-    fn get_inputs(&self)->Vec<NodeInputOptions> {
-        let mut presetValues = HashMap::new();
-        presetValues.insert("add".to_string(), 0);
-        presetValues.insert("subtract".to_string(), 1);
-        presetValues.insert("multiply".to_string(), 2);
-        presetValues.insert("divide".to_string(), 3);
+impl NodeStatic for MathNode{
+    
+    fn get_inputs_static()->Vec<NodeInputOptions>{
+        let mut presetValues = vec![];
+        presetValues.push("add".to_string());
+        presetValues.push("subtract".to_string());
+        presetValues.push("multiply".to_string());
+        presetValues.push("divide".to_string());
         vec![NodeInputOptions{name:"operation".to_string(),IOType: NodeIOType::IntType(0),canAlterDefault:true,hasConnection:false,presetValues:Some(presetValues)},
             NodeInputOptions{name:"x".to_string(),IOType:NodeIOType::FloatType(f64::default()),canAlterDefault:true,hasConnection:true,presetValues:None},
             NodeInputOptions{name:"y".to_string(),IOType:NodeIOType::FloatType(f64::default()),canAlterDefault:true,hasConnection:true,presetValues:None},]
-            
     }
 
-    fn get_outputs(&self)->Vec<NodeOutputOptions> {
+    fn get_outputs_static()->Vec<NodeOutputOptions>{
         vec![NodeOutputOptions{name:"result".to_string(),IOType:NodeIOType::FloatType(f64::default()),hasConnection:true}]
     }
 
+    fn get_node_name_static()->String {
+        "Math".to_string()
+    }
+}
+
+impl Node for MathNode{
     fn clear_buffers(&mut self) {
         self.buffered = false;
     }

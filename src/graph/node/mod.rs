@@ -7,8 +7,10 @@ pub mod floatLiteralNode;
 pub mod colorLiteralNode;
 pub mod rotationNode;
 pub mod mathNode;
+pub mod colorToImageNode;
 
 use std::{vec, result, fmt, collections::HashMap};
+use serde::{Serialize, Deserialize, Serializer, ser::SerializeStruct};
 use thiserror::Error;
 use image::{RgbaImage, Rgba};
 
@@ -18,7 +20,7 @@ pub struct NodeInputOptions{
     pub canAlterDefault: bool,
     pub hasConnection:bool,
     pub name : String,
-    pub presetValues : Option<HashMap<String,i64>>
+    pub presetValues : Option<Vec<String>>
 }
 
 pub struct NodeOutputOptions{
@@ -26,6 +28,58 @@ pub struct NodeOutputOptions{
     pub hasConnection:bool,
     pub name : String
 }
+
+
+impl Serialize for NodeInputOptions{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("NodeInputOptions", 6)?;
+        let IOType = match &self.IOType{
+            NodeIOType::IntType(val) =>{ state.serialize_field("defaultValue", &val)?; "int"},
+            NodeIOType::FloatType(val) => { state.serialize_field("defaultValue", &val)?; "float"},
+            NodeIOType::BitmapType(_) => { state.serialize_field("defaultValue", &Option::<()>::None)?; "bitmap"},
+            NodeIOType::ColorType(val) => { state.serialize_field("defaultValue", &val.0)?; "color"},
+            NodeIOType::StringType(val) => { state.serialize_field("defaultValue", &val)?; "string"},
+        
+        };
+        state.serialize_field("IOType",IOType)?;
+        state.serialize_field("canAlterDefault", &self.canAlterDefault)?;
+        state.serialize_field("hasConnection", &self.hasConnection)?;
+        state.serialize_field("name", &self.name)?;
+        state.serialize_field("presetValues", &self.presetValues)?;
+        state.end()
+    }
+}
+
+impl Serialize for NodeOutputOptions{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("NodeInputOptions", 3)?;
+        state.serialize_field("IOType", match self.IOType{
+            NodeIOType::IntType(_) => "int",
+            NodeIOType::FloatType(_) => "float",
+            NodeIOType::BitmapType(_) => "bitmap",
+            NodeIOType::ColorType(_) => "color",
+            NodeIOType::StringType(_) => "string",
+
+        })?;
+        state.serialize_field("hasConnection", &self.hasConnection)?;
+        state.serialize_field("name", &self.name)?;
+        state.end()
+    }
+}
+
+#[derive(Serialize)]
+pub struct NodeDescriptor{
+    pub inputNodes : Vec<NodeInputOptions>,
+    pub outputNodes : Vec<NodeOutputOptions>,
+    pub name : String
+}
+
 
 #[derive(Clone)]
 pub enum NodeIOType{
@@ -81,20 +135,41 @@ pub enum NodeError{
 pub type NodeResult<T> = result::Result<T, NodeError>;
 
 
-
-//all fields in implementors that are set with the set_x methods are expected to be repopulated after every processing run.
-pub trait Node: Send + Sync{
-    
-    
-    fn get_outputs(&self)->Vec<NodeOutputOptions>{
+pub trait NodeStatic: Send + Sync{
+    fn get_inputs_static()->Vec<NodeInputOptions> where
+    Self:Sized
+    {
         vec![]
     }
+
+    fn get_outputs_static()->Vec<NodeOutputOptions> where
+    Self:Sized
+    {
+        vec![]
+    }
+
+    fn get_node_name_static()->String where Self:Sized;
+
+    fn get_node_descriptor()->NodeDescriptor where Self:Sized{
+        NodeDescriptor { inputNodes: Self::get_inputs_static(), outputNodes: Self::get_outputs_static(), name: Self::get_node_name_static() }
+    }
+
+
+}
+
+
+pub trait NodeDefaults: Send+Sync{
+    fn get_outputs(&self)->Vec<NodeOutputOptions>;
 
     //return all the node's inputs, the NodeIOType enum must contain the default input for the given index
-    fn get_inputs(&self)->Vec<NodeInputOptions>{
-        vec![]
-    }
+    fn get_inputs(&self)->Vec<NodeInputOptions>;
 
+    fn get_node_name(&self)->String;
+}
+
+//all fields in implementors that are set with the set_x methods are expected to be repopulated after every processing run.
+pub trait Node: Send + Sync + NodeDefaults + NodeStatic{
+    
     fn generate_output_errors(&self, index:&u16)->NodeResult<()>{
         if(self.get_outputs().len() < (*index as usize)){
             return NodeResult::Err(NodeError::InvalidOutputIndex(self.get_node_name(), *index));
@@ -112,7 +187,7 @@ pub trait Node: Send + Sync{
         return NodeResult::Ok(())
     }
 
-    fn get_node_name(&self)->String;
+
 
     fn clear_buffers(&mut self){
 
@@ -127,4 +202,16 @@ pub trait Node: Send + Sync{
     }
 
 
+}
+
+impl<T: NodeStatic + Sized> NodeDefaults for T{
+    fn get_outputs(&self)->Vec<NodeOutputOptions> {
+        T::get_outputs_static()
+    }
+    fn get_inputs(&self)->Vec<NodeInputOptions> {
+        T::get_inputs_static()
+    }
+    fn get_node_name(&self)->String {
+        T::get_node_name_static()
+    }
 }
