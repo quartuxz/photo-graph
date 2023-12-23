@@ -5,9 +5,10 @@ async function main(){
   
   await GraphNode.loadNodeTemplates();
   Mat3.test();
-
-  let graph = new Graph();
-  let ui = new UI(graph,document.getElementById("canvas"));
+  let canvas = document.getElementById("canvas");
+  let context = canvas.getContext("2d")
+  let graph = new Graph(context);
+  let ui = new UI(graph,canvas, context);
 }
 
 main();

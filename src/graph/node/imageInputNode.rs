@@ -23,7 +23,7 @@ impl ImageInputNode{
 impl NodeStatic for ImageInputNode{
 
     fn get_inputs_static()->Vec<NodeInputOptions>{
-        vec![NodeInputOptions{IOType:NodeIOType::StringType(crate::RESOURCE_PATH.clone() + r"images\" + "dummy2.png"), canAlterDefault:true,hasConnection:false, name:"path".to_string(), presetValues:None}]
+        vec![NodeInputOptions{IOType:NodeIOType::StringType(crate::RESOURCE_PATH.clone() + r"images\" + "dummy2.png"), canAlterDefault:true,hasConnection:false, name:"path".to_string(), presetValues:None,subtype:Some(NodeIOSubtypes::FilePath)}]
     }
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{

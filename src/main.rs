@@ -2,9 +2,10 @@ mod graph;
 #[macro_use]
 extern crate lazy_static;
 
+use std::fs::File;
 use std::hash::Hash;
 use std::io::Cursor;
-use std::{fs, collections::HashMap};
+use std::{fs, collections::HashMap,io::Write};
 use std::sync::Mutex;
 
 
@@ -28,13 +29,82 @@ struct param{
 }
 
 struct AppState{
-    graphs : Mutex<HashMap<u64,graph::Graph>>
+    graphs : Mutex<HashMap<u64,graph::Graph>>,
+    currentID : Mutex<u64>
 }
 
 
+#[get("/retrieveGraphFileList")]
+async fn retrieve_graph_file_list()->impl Responder{
+    let paths = fs::read_dir(RESOURCE_PATH.clone()+r"\graphs").unwrap();
+    let mut out = vec![];
+    for path in paths {
+        out.push(path.unwrap().file_name().to_str().unwrap().to_string());
+    }
+    HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&out).unwrap())
+}
+
+#[post("/loadGraph")]
+async fn load_graph(data: web::Data<AppState>, body:web::Bytes)->impl Responder{
+    let mut graphs = data.graphs.lock().unwrap();
+    let mut currentID = data.currentID.lock().unwrap();
+    let contents = fs::read_to_string(RESOURCE_PATH.clone()+r"\graphs\"+&String::from_utf8(body.to_vec()).unwrap()).unwrap();
+
+    let mut loadedGraph = Graph::new();
+    loadedGraph.execute_commands(serde_json::from_str(&contents).unwrap()).unwrap();
+    graphs.insert(*currentID, loadedGraph);
+    *currentID += 1;
+    HttpResponse::Ok().content_type("text").body((*currentID-1).to_string())
+}
+
+#[get("/retrieveGraph")]
+async fn retrieve_graph(data: web::Data<AppState>, body:web::Bytes)->impl Responder{
+    let mut graphs = data.graphs.lock().unwrap();
+
+    HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&graphs.get(&(String::from_utf8(body.to_vec()).unwrap()).parse().unwrap()).unwrap().commandHistory).unwrap())
+}
+
+#[derive(Deserialize)]
+struct SaveInfo{
+    fileName: String,
+    graphID : u64
+}
+
+#[post("/saveGraph")]
+async fn save_graph(data: web::Data<AppState>, saveInfo:Json<SaveInfo>)->impl Responder{
+    let mut graphs = data.graphs.lock().unwrap();
+    let mut output = File::create(RESOURCE_PATH.clone()+r"\graphs\"+&saveInfo.fileName).unwrap();
+    write!(output,"{}",serde_json::to_string(&graphs.get(&saveInfo.graphID).unwrap().commandHistory).unwrap()).unwrap();
+    HttpResponse::Ok()
+}
+
+#[post("/createGraph")]
+async fn create_graph(data: web::Data<AppState>, body:web::Bytes)->impl Responder{
+    let mut graphs = data.graphs.lock().unwrap();
+    let mut currentID = data.currentID.lock().unwrap();
+    let mut newGraph = Graph::new();
+    graphs.insert(*currentID, newGraph);
+    *currentID += 1;
+    HttpResponse::Ok().content_type("text").body((*currentID-1).to_string())
+}
+
 #[get("/")]
+async fn graph_selector_html()-> impl Responder{
+    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"graph_selector.html").unwrap();
+
+    HttpResponse::Ok().content_type("text/html").body(contents)
+}
+
+#[get("/graph_selector.js")]
+async fn graph_selector_javascript()->impl Responder{
+    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"graph_selector.js").unwrap();
+
+    HttpResponse::Ok().content_type("text/javascript").body(contents)
+}
+
+#[get("/graph")]
 async fn graph_page_html() -> impl Responder {
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"test.html").unwrap();
+    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"main.html").unwrap();
 
     HttpResponse::Ok().content_type("text/html").body(contents)
     //HttpResponse::Ok().body(r#"<script>
@@ -117,11 +187,11 @@ async fn command_graph(data: web::Data<AppState>, commands: Json<graph::Commands
     HttpResponse::Ok().content_type("text").body(match graphs.get_mut(&0).unwrap().execute_commands(commands.clone()).err(){
         Some(error) => match error{
             graph::GraphError::Cycle=>"cycle",
-            graph::GraphError::EdgeNotFound => "edge",
-            graph::GraphError::NodeNotFound => "node",
-            graph::GraphError::MismatchedNodes => "mismatched",
-            graph::GraphError::UnknownCommand => "unknown",
-            graph::GraphError::IllFormedCommand => "ill-formed"
+            graph::GraphError::EdgeNotFound => "edge not found",
+            graph::GraphError::NodeNotFound => "node not found",
+            graph::GraphError::MismatchedNodes => "mismatched sockets",
+            graph::GraphError::UnknownCommand => "unknown command",
+            graph::GraphError::IllFormedCommand => "ill-formed command"
              },
         None => "ok"
     })
@@ -136,7 +206,7 @@ async fn retrieve_node_templates()->impl Responder{
     descriptors.push(graph::node::imageInputNode::ImageInputNode::get_node_descriptor());
     descriptors.push(graph::node::colorToImageNode::ColorToImageNode::get_node_descriptor());
     //println!("{}",serde_json::to_string(&descriptors).unwrap());
-    HttpResponse::Ok().content_type("text").body(serde_json::to_string(&descriptors).unwrap())
+    HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&descriptors).unwrap())
 }
 
 #[derive(Deserialize)]
@@ -160,11 +230,19 @@ async fn main() -> std::io::Result<()> {
     let mut graphs = HashMap::new();
     graphs.insert(0, Graph::new());
     let appState = web::Data::new(AppState{
-        graphs: Mutex::new(graphs)
+        graphs: Mutex::new(graphs),
+        currentID: Mutex::new(1)
     });
     HttpServer::new(move || {
         App::new()
             .app_data(appState.clone())
+            .service(retrieve_graph)
+            .service(save_graph)
+            .service(load_graph)
+            .service(create_graph)
+            .service(retrieve_graph_file_list)
+            .service(graph_selector_html)
+            .service(graph_selector_javascript)
             .service(process_graph)
             .service(graph_page_html)
             //.service(Files::new("/images", RESOURCE_PATH.clone()+"/images"))

@@ -1,6 +1,6 @@
 pub mod node;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use std::{collections::HashMap, hash::Hash, fmt};
 use crate::graph::node::{imageInputNode, NodeStatic, floatLiteralNode::FloatLiteralNode};
@@ -17,7 +17,7 @@ pub struct Edge{
 }
 
 
-#[derive(Deserialize, Clone)]
+#[derive(Serialize,Deserialize, Clone)]
 pub struct Command{
     name : String,
     args : Vec<String>
@@ -46,8 +46,9 @@ pub type Commands = Vec<Command>;
 pub struct Graph{
     nodes: HashMap<usize,Box<dyn node::Node>>,
     edges : Vec<(usize, Edge)>,
+    IDCount : usize,
     defaultInputEdges: HashMap<usize, Vec<Edge>>,
-    commandHistory : Commands
+    pub commandHistory : Commands
 
 }
 
@@ -102,27 +103,51 @@ impl Graph{
     }
 
 
-    fn recalculate_layers(&mut self)->GraphResult<()>{
+    fn check_for_cycle(&self, edge:&Edge)->bool{
+        
+
+        if edge.inputNode == edge.outputNode {
+            return true;
+        }
+
+        let mut forward_edges_to_check = vec![edge];
+        while forward_edges_to_check.len() != 0{
+            let mut new_forward_edges_to_check: Vec<&Edge> = vec![];
+
+            for edge2 in &self.edges {
+                for edge3 in &forward_edges_to_check{
+                    if edge3.inputNode == edge2.1.outputNode {
+                        new_forward_edges_to_check.push(&edge2.1);
+                    }
+                }
+            }
+
+            for forward_edge in &new_forward_edges_to_check{
+                if(**forward_edge == *edge){
+                    return true;
+                }
+            }
+            forward_edges_to_check = new_forward_edges_to_check;
+
+        }
+
+        return false;
+    }
+
+    fn recalculate_layers(&mut self){
         let mut distances : Vec<usize> = vec![];
         for edge in &self.edges {
             let mut distance_from_literal = 0;
             let mut edges_to_check = vec![&edge.1];
-            let mut visited_edges: Vec<&Edge> = vec![&edge.1];
             while edges_to_check.len() != 0{
+
                 let mut new_edges_to_check: Vec<&Edge> = vec![];
                 for edge2 in &self.edges{
-                    //check if the inputting node is in an edge as the receipient(i.e is not a literal node)
                     for edge3 in &edges_to_check {
+                        //check if the inputting node is in an edge as the receipient(i.e is not a literal node)
+                        //check if the edge connects to the same node
                         if edge3.outputNode == edge2.1.inputNode {
-                            //detecting loops in the graph
-                            for edge4 in &visited_edges{
-                                if **edge4 == edge2.1{
-                                    return GraphResult::Err(GraphError::Cycle);
-                                }
-                            }
-                            
                             new_edges_to_check.push(&edge2.1);
-                            visited_edges.push(&edge2.1);
                         }
                     }
                 }
@@ -139,12 +164,11 @@ impl Graph{
             self.edges[i].0 = distances[i]; 
         }
 
-        GraphResult::Ok(())
     }
 
 
     fn add_edge(&mut self, edge:Edge)->GraphResult<()>{
-        
+
         //checks if the nodes have outputs/inputs at given indices
         if(self.nodes[&(edge.inputNode as usize)].get_inputs().len() < (edge.inputIndex as usize) || self.nodes[&(edge.outputNode as usize)].get_outputs().len() < (edge.outputIndex as usize)){
             return GraphResult::Err(GraphError::MismatchedNodes);
@@ -153,16 +177,32 @@ impl Graph{
         if(std::mem::discriminant(&self.nodes[&(edge.inputNode as usize)].get_inputs()[edge.inputIndex as usize].IOType) != std::mem::discriminant(&self.nodes[&(edge.outputNode as usize)].get_outputs()[edge.outputIndex as usize].IOType)){
             return GraphResult::Err(GraphError::MismatchedNodes);
         }
-
+        let mut removed:Option<Edge> = None;
         //removes old edge at input index and node
         for i in 0..self.edges.len(){
             if(self.edges[i].1.inputNode == edge.inputNode && self.edges[i].1.inputIndex == edge.inputIndex){
-                self.edges.remove(i);
+
+                let (_,removed_edge) = self.edges.remove(i);
+                removed = Some(removed_edge);
                 break;
             }
         }
-        self.edges.push((0, edge));
-        return self.recalculate_layers();
+        self.edges.push((0, edge.clone()));
+
+        //undos the adding of the edge to restore to previous state
+        return if !self.check_for_cycle(&edge)  {
+            self.recalculate_layers();
+            GraphResult::Ok(())
+        }
+        else {
+            self.remove_edge_and_replace_with_default(&edge, false)?;
+            if let Some(removed_edge) = removed{
+                self.add_edge(removed_edge)?;
+            }else{
+                self.recalculate_layers();
+            }
+            GraphResult::Err(GraphError::Cycle)
+        };
     }
 
     //an edge to remove and a bool indicating wether an expensive layer recalculation is need to update the order in which the nodes are used
@@ -176,7 +216,7 @@ impl Graph{
                         }
                     }
                     if(recalculate){
-                        return self.recalculate_layers();
+                        self.recalculate_layers();
                     }
                     return GraphResult::Ok(());
                 }
@@ -184,13 +224,13 @@ impl Graph{
         return GraphResult::Err(GraphError::EdgeNotFound);
     }
 
-    fn remove_node(&mut self, index: usize)->GraphResult<()>{
+    fn remove_node(&mut self, index: usize,recalculate :bool)->GraphResult<()>{
 
         if !self.nodes.contains_key(&index){
             return GraphResult::Err(GraphError::NodeNotFound);
         }
 
-        self.nodes.remove(&index);
+        let removedNodeO = self.nodes.remove(&index);
         let mut toRemove:Vec<usize> = vec![];
 
         for i in 0..self.edges.len(){
@@ -210,19 +250,27 @@ impl Graph{
             self.edges.remove(removing-removed);
             removed +=1;
         }
+        if let Some(removedNode) = removedNodeO{
+            for i in (index+1)..(removedNode.get_inputs().len()+index+1){
+                self.remove_node(i,false);
+            }
+        }
 
-        return self.recalculate_layers();
+        if recalculate{
+            self.recalculate_layers();
+        }
+
+        Ok(())
     }
 
     //add a node and it's literal nodes.
     fn add_node(&mut self, node: Box<dyn node::Node>){
-        let nodeKey =self.nodes.len();
         let inputs = node.get_inputs(); 
-        self.nodes.insert(nodeKey, node);
-        self.defaultInputEdges.insert(nodeKey, vec![]);
+        self.nodes.insert(self.IDCount, node);
+        self.defaultInputEdges.insert(self.IDCount, vec![]);
         let mut index = 0;
         for input in inputs{
-            let defNodeKey = self.nodes.len();
+            let defNodeKey = self.IDCount+index+1;
             let defNode:Box<dyn Node> = match input{
                 NodeInputOptions {IOType:NodeIOType::BitmapType(bitmap),..} => Box::new(node::bitmapLiteralNode::BitmapLiteralNode::new(bitmap)),
                 NodeInputOptions {IOType:NodeIOType::ColorType(color),..} => Box::new(node::colorLiteralNode::ColorLiteralNode::new(color)),
@@ -231,15 +279,16 @@ impl Graph{
                 NodeInputOptions {IOType:NodeIOType::StringType(stringLiteral),..} => Box::new(node::stringLiteralNode::StringLiteralNode::new(stringLiteral))
             };
             self.nodes.insert(defNodeKey, defNode);
-            let inputEdge = Edge { inputIndex: index, outputIndex: 0, inputNode: nodeKey, outputNode: defNodeKey };
+            let inputEdge = Edge { inputIndex: index as u16, outputIndex: 0, inputNode: self.IDCount, outputNode: defNodeKey };
             self.edges.push((0,inputEdge.clone()));
-            self.defaultInputEdges.get_mut(&nodeKey).unwrap().push(inputEdge);
+            self.defaultInputEdges.get_mut(&self.IDCount).unwrap().push(inputEdge);
             index+=1;
         }
+        self.IDCount += index+1;
     }
 
     pub fn new()->Self{
-        let mut graph=Graph { nodes : HashMap::new(), edges : vec![], defaultInputEdges : HashMap::new(), commandHistory: vec![]};
+        let mut graph=Graph { nodes : HashMap::new(), edges : vec![], defaultInputEdges : HashMap::new(), commandHistory: vec![], IDCount:0};
         graph.add_node(Box::new(node::finalNode::FinalNode::new()));
         //graph.add_node(Box::new(node::imageInputNode::ImageInputNode::new()));
         //graph.add_edge(Edge{inputIndex:0,outputIndex:0,inputNode:0,outputNode:2}).unwrap();
@@ -257,7 +306,10 @@ impl Graph{
                     self.add_node(Box::new(node::imageInputNode::ImageInputNode::new()));
                 }else if cmd.args[0] == node::colorToImageNode::ColorToImageNode::get_node_name_static(){
                     self.add_node(Box::new(node::colorToImageNode::ColorToImageNode::new()));
+                }else if cmd.args[0] == node::mathNode::MathNode::get_node_name_static(){
+                    self.add_node(Box::new(node::mathNode::MathNode::new()));
                 }
+                "removeNode" => self.remove_node(cmd.args[0].parse().unwrap(),true)?,
                 "moveNode" => (),
                 "modifyDefault" => {match self.nodes.get_mut(&cmd.args[0].parse().unwrap()){
                     Some(node) => {
@@ -345,6 +397,30 @@ mod tests{
 
         let res = graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:8,outputNode:2});
         assert_eq!(res, Err(GraphError::Cycle));
+
+        let mut graph = super::Graph::new();
+        //2
+        graph.add_node(Box::new(super::node::colorToImageNode::ColorToImageNode::new()));
+        //6
+        graph.add_node(Box::new(super::node::mathNode::MathNode::new()));
+        //10
+        graph.add_node(Box::new(super::node::mathNode::MathNode::new()));
+        //14
+        graph.add_node(Box::new(super::node::mathNode::MathNode::new()));
+        //18
+        graph.add_node(Box::new(super::node::mathNode::MathNode::new()));
+        //22
+        graph.add_node(Box::new(super::node::mathNode::MathNode::new()));
+
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:2,outputNode:6}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:6,outputNode:10}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:2, outputIndex:0, inputNode:6,outputNode:14}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:10,outputNode:22}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:14,outputNode:18}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:18,outputNode:22}).unwrap();
+
+        let res = graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:0,outputNode:2});
+        assert_eq!(res, Ok(()));
     }
 
     #[test]

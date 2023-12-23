@@ -19,9 +19,9 @@ impl ColorToImageNode{
 impl NodeStatic for ColorToImageNode{
 
     fn get_inputs_static()->Vec<NodeInputOptions>{
-        vec![NodeInputOptions{IOType:NodeIOType::ColorType(Rgba([100,100,100,255])), canAlterDefault:true,hasConnection:true, name:"color".to_string(), presetValues:None},
-            NodeInputOptions{IOType:NodeIOType::FloatType(500.0), canAlterDefault:true,hasConnection:true, name:"width".to_string(), presetValues:None},
-            NodeInputOptions{IOType:NodeIOType::FloatType(500.0), canAlterDefault:true,hasConnection:true, name:"height".to_string(), presetValues:None}]
+        vec![NodeInputOptions{IOType:NodeIOType::ColorType(Rgba([100,100,100,255])), canAlterDefault:true,hasConnection:true, name:"color".to_string(), presetValues:None,subtype:None},
+            NodeInputOptions{IOType:NodeIOType::FloatType(500.0), canAlterDefault:true,hasConnection:true, name:"width".to_string(), presetValues:None,subtype:None},
+            NodeInputOptions{IOType:NodeIOType::FloatType(500.0), canAlterDefault:true,hasConnection:true, name:"height".to_string(), presetValues:None,subtype:None}]
     }
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{
@@ -52,10 +52,16 @@ impl Node for ColorToImageNode{
             0 => if let NodeIOType::ColorType(color) = value{
                 self.color = color;
             }
-            1 => if let NodeIOType::FloatType(float) = value{
+            1 => if let NodeIOType::FloatType(mut float) = value{
+                if(float < 1.0){
+                    float = 1.0;
+                }
                 self.width = float as u32;
             }
-            2 => if let NodeIOType::FloatType(float) = value{
+            2 => if let NodeIOType::FloatType(mut float) = value{
+                if(float < 1.0){
+                    float = 1.0;
+                }
                 self.height = float as u32;
             }
             _ => ()

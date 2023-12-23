@@ -1,5 +1,5 @@
 
-
+let graphFontStyle = "15px seif";
 
 
 class NodeIO{
@@ -24,6 +24,7 @@ class NodeIO{
     #positionCorner = Vec2(100,100);
     #transformation = Mat3.identity();
     #objectTransformation = Mat3.identity();
+    #context;
     //as relative positions with respect to the node
     inputCircles = [];
     outputCircles = [];
@@ -33,36 +34,78 @@ class NodeIO{
     isInvisible = false;
     value;
     template;
+    selected = false;
     static nodeTemplates;
     
-    
+    static #chooseCircleStyle(IOType){
+      if(IOType == "int"){
+        return "rgb(150,200,150)";
+      }else if(IOType == "color"){
+        return "rgb(200,200,150)";
+      }else if(IOType == "float"){
+        return "rgb(150,200,200)";
+      }else if(IOType == "string"){
+        return "rgb(200,150,150)";
+      }else if(IOType== "bitmap"){
+        return "rgb(150,150,200)";
+      }
+    }
   
-    constructor(nodeName,position){
+    constructor(nodeName,position,context){
+      this.#context = context;
+
+      this.#context.save();
+      this.#context.font =  graphFontStyle;
+      
+
+
 
       const template = GraphNode.nodeTemplates.get(nodeName);
+      let widths = [100,this.#context.measureText(template.name).width+20];
       this.template = template;
       this.nodesOccupied = template.inputNodes.length+1;
       this.nodeName = template.name;
       this.#objectTransformation = Mat3.translate(position.x,position.y);
-      this.#positionCorner = Vec2(100,50+50*Math.max(template.inputNodes.length,template.outputNodes.length));
-      let offset = 1;
+
+      
+      for(let i = 0; i<template.inputNodes.length;i++){
+
+        if(template.inputNodes[i].hasConnection){
+          widths.push(this.#context.measureText(template.inputNodes[i].name).width+20);
+        }
+
+      }
+
+      for(let i = 0; i<template.outputNodes.length;i++){
+        if(template.outputNodes[i].hasConnection){
+          widths.push(this.#context.measureText(template.outputNodes[i].name).width+20);
+        }
+      }
+
+      let totalWidth = Math.max(...widths);
+
+
+      let visibleInputSockets = 0;
       for(let i = 0; i<template.inputNodes.length;i++){
         this.defaultValues.push(template.inputNodes[i].defaultValue);
 
         if(template.inputNodes[i].hasConnection){
-
-          this.inputCircles.push({center:Vec2(0,50*offset),radius:Vec2(10,50*offset),style:'green',socketID:i });
+          
+          this.inputCircles.push({center:Vec2(0,50*(visibleInputSockets+1)),radius:Vec2(10,50*(visibleInputSockets+1)),style:GraphNode.#chooseCircleStyle(template.inputNodes[i].IOType),socketID:i,name:template.inputNodes[i].name });
+          visibleInputSockets += 1;
         }
-        offset += 1;
 
       }
-      offset = 1;
+      let visibleOutputSockets = 0;
       for(let i = 0; i<template.outputNodes.length;i++){
         if(template.outputNodes[i].hasConnection){
-          this.outputCircles.push({center:Vec2(100,50*offset),radius:Vec2(100+10,50*offset),style:'green',socketID:i })
+          this.outputCircles.push({center:Vec2(totalWidth,50*(visibleOutputSockets+1)+25),radius:Vec2(totalWidth+10,50*(visibleOutputSockets+1)+25),style:GraphNode.#chooseCircleStyle(template.outputNodes[i].IOType),socketID:i, name:template.outputNodes[i].name })
+          visibleOutputSockets += 1;
         }
-        offset += 1;
       }
+      this.#positionCorner = Vec2(totalWidth,50+50*Math.max(visibleInputSockets,visibleOutputSockets));
+
+      this.#context.restore();
     }
 
     static async loadNodeTemplates(){
@@ -140,38 +183,54 @@ class NodeIO{
       return null;
     }
   
-    #drawCircles(context, circles){
+    #drawCircles(circles,isInput){
       for (const circle of circles){
-        context.save();
-        context.beginPath();
-        context.arc(circle.center.x, circle.center.y, circle.center.distance(circle.radius) ,0,Math.PI*2,false);
-        context.fillStyle= circle.style;
-        context.fill();
-        context.restore();
+        this.#context.save();
+        this.#context.beginPath();
+        this.#context.arc(circle.center.x, circle.center.y, circle.center.distance(circle.radius) ,0,Math.PI*2,false);
+        this.#context.fillStyle= circle.style;
+        this.#context.fill();
+        this.#context.restore();
+
+        this.#context.save();
+        this.#context.fillStyle = "black";
+
+        this.#context.font =  graphFontStyle;
+        let xoffset = circle.center.x+circle.center.distance(circle.radius)+3;
+        if(!isInput){
+          xoffset = circle.center.x-circle.center.distance(circle.radius)-this.#context.measureText(circle.name).width-3;
+        }
+        this.#context.fillText(circle.name,xoffset,circle.center.y);
+        this.#context.restore();
+
       }
     }
   
-    draw(context){
+    draw(){
       if(!this.isInvisible){
         let transformed = this.getObjectTransformed();
-        context.save();
-        context.fillStyle = 'blue';
-        context.strokeStyle = 'red';
-        context.beginPath();
-        context.roundRect(transformed.position.x,transformed.position.y,transformed.positionCorner.x-transformed.position.x,transformed.positionCorner.y-transformed.position.y,5);
-        context.fill();
-        context.stroke();
-        context.restore();
+        this.#context.save();
+        this.#context.fillStyle = "rgb(60,100,60)";
+        this.#context.strokeStyle = "rgb(100,60,60)";
+        if(this.selected){
+          this.#context.strokeStyle = "rgb(200,120,120)";
+          this.#context.lineWidth = 4;
+        }
+        this.#context.beginPath();
+        this.#context.roundRect(transformed.position.x,transformed.position.y,transformed.positionCorner.x-transformed.position.x,transformed.positionCorner.y-transformed.position.y,5);
+        this.#context.fill();
+        this.#context.stroke();
+        this.#context.restore();
 
-        context.save();
-        context.fillStyle = "green";
-        context.font = ((transformed.positionCorner.x-transformed.position.x)/5)+"px seif";
-        context.fillText(this.nodeName,transformed.position.x+20, transformed.position.y+20);
-        context.restore();
+        this.#context.save();
+        this.#context.fillStyle = "black";
+        this.#context.font = graphFontStyle;
+        this.#context.fillText(this.nodeName,transformed.position.x+5, transformed.position.y+20);
+        this.#context.restore();
 
 
-        this.#drawCircles(context, transformed.inputCircles);
-        this.#drawCircles(context, transformed.outputCircles);
+        this.#drawCircles(transformed.inputCircles,true);
+        this.#drawCircles(transformed.outputCircles,false);
       }
     }
   
@@ -226,9 +285,11 @@ class NodeIO{
     #transformation = Mat3.identity();
     #lines = [];
     #currentID = 0;
+    #context;
   
-    constructor(){
-      this.#_addNode(new GraphNode("Final",Vec2(0,0)));
+    constructor(context){
+      this.#context = context;
+      this.#_addNode(new GraphNode("Final",Vec2(0,0),this.#context));
     }
     
     getLineByInput(inputID, inputSocket){
@@ -269,7 +330,32 @@ class NodeIO{
   
     addNamedNode(nodeName,position){
       this.#registerCommands([new Command("addNode", [nodeName,position.x.toString(),position.y.toString()])]);
-      this.#_addNode(new GraphNode(nodeName,position));
+
+      this.#_addNode(new GraphNode(nodeName,position,this.#context));
+    }
+
+    #_removeNode(id){
+      let toRemovePos = -1;
+      for(let i = 0; i< this.#nodes.length;i++){
+        if(this.#nodes[i].id == id){
+          toRemovePos=i;
+        }
+      }
+      this.#nodes.splice(toRemovePos,1);
+      let toRemove = [];
+      for(const line of this.#lines){
+        if(line.toID == id || line.fromID == id){
+          toRemove.push(line);
+        }
+      }
+      for(const line of toRemove){
+        this.#_removeLine(line);
+      }
+    }
+
+    removeNode(id){
+      this.#registerCommands([new Command("removeNode",[id.toString()])]);
+      this.#_removeNode(id);
     }
 
     #_modifyDefault(node, nodeID,parameters){
@@ -334,7 +420,7 @@ class NodeIO{
       this.#registerCommands([new Command("moveNode",[nodeID.toString(),delta.x.toString(),delta.y.toString()])]);
     }
 
-    draw(context){
+    draw(){
   
       for (const line of this.#lines){
         let from = null;
@@ -350,18 +436,18 @@ class NodeIO{
             to = circle.center;
           }
         }
-        context.save();
-        context.beginPath();
-        context.moveTo(from.x,from.y);
-        context.lineTo(to.x,to.y);
-        context.strokeStyle= 'cyan';
-        context.lineWidth = 4;
-        context.stroke();
-        context.restore();
+        this.#context.save();
+        this.#context.beginPath();
+        this.#context.moveTo(from.x,from.y);
+        this.#context.lineTo(to.x,to.y);
+        this.#context.strokeStyle= 'cyan';
+        this.#context.lineWidth = 4;
+        this.#context.stroke();
+        this.#context.restore();
       }
 
       for (const node of this.#nodes){
-        node.draw(context);
+        node.draw();
       }
 
     }
@@ -375,7 +461,8 @@ class NodeIO{
     
     //returns the UI element which is pointed to in the position for any node
     getPointed(pos){
-      for (const node of this.#nodes){
+      for(let i = this.#nodes.length-1; i>=0; i--){
+        let node = this.#nodes[i];
         let pointed = node.getPointed(pos);
         if(pointed != null){
           return pointed;

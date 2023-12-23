@@ -15,8 +15,8 @@ impl RotationNode{
 
 impl NodeStatic for RotationNode{
     fn get_inputs_static()->Vec<NodeInputOptions>{
-        vec![NodeInputOptions{name:"bitmap".to_string(),IOType: NodeIOType::BitmapType(RgbaImage::default()),canAlterDefault:false,hasConnection:true, presetValues:None},
-            NodeInputOptions{name: "angle".to_string(),IOType: NodeIOType::FloatType(0.0),canAlterDefault:true,hasConnection:true, presetValues:None}]
+        vec![NodeInputOptions{name:"bitmap".to_string(),IOType: NodeIOType::BitmapType(RgbaImage::default()),canAlterDefault:false,hasConnection:true, presetValues:None,subtype:None},
+            NodeInputOptions{name: "angle".to_string(),IOType: NodeIOType::FloatType(0.0),canAlterDefault:true,hasConnection:true, presetValues:None,subtype:None}]
     }
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{

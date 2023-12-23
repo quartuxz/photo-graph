@@ -28,10 +28,10 @@ function RGBToHexadecimal(r,g,b){
 
 class ContextMenu{
   type;
-  selected;
+  selected = null;
   position;
   ui;
-  nodeIDs = new Map();
+  nodeProperties = new Map();
   
   constructor(type, parameter, ui){
     this.type = type;
@@ -40,24 +40,45 @@ class ContextMenu{
       document.getElementById("contextInner").innerHTML = "";
     }
     else if(type == "manipulate"){
+      this.selected = parameter;
+      this.selected.selected = true;
       document.getElementById("contextInner").innerHTML = "";
-      let contents = "Edit "+ parameter.nodeName +": <br> <form id=\"manipulateForm\" >";
+      let contents = "Edit \""+ parameter.nodeName +"\": <br> <form id=\"manipulateForm\" >";
       console.log(parameter.template);
       let isEditable = false;
       for(let i = 0; i < parameter.template.inputNodes.length;i++){
 
         const inode = parameter.template.inputNodes[i];
-        this.nodeIDs.set(inode.name,parameter.id+i+1);
+        this.nodeProperties.set(inode.name,{id:parameter.id+i+1,hasConnection:false});
         if(inode.canAlterDefault){
           isEditable = true;
-          contents += "<label for=\""+ inode.name +"\">"+inode.name+"</label> <br>";
+
           let value = parameter.defaultValues[i];
-          if(inode.IOType == "color"){
+          if(this.ui.graph.getLineByInput(parameter.id,i)!= null){
+            contents += inode.name+"<br> connected<br>";
+            this.nodeProperties.get(inode.name).hasConnection = true;
+          }
+          else if(inode.IOType == "color"){
+            contents += "<label for=\""+ inode.name +"\">"+inode.name+"</label> <br>";
             contents += "<input type=\"color\" id=\""+inode.name+"\" name=\""+inode.name+"\" value=\""+RGBToHexadecimal(value[0],value[1],value[2])+"\"></input> <br>";
             contents += "<label for=\"alpha\">alpha:</label> <br>";
-            contents += "<input type=\"text\" id=\"alpha\" name=\"alpha\" value=\""+value[3]+"\"></input>";
+            contents += "<input type=\"text\" id=\"alpha\" name=\"alpha\" value=\""+value[3]+"\"></input> <br>";
+          }else if(inode.presetValues != null){
+            contents += inode.name+":<br>";
+            for(let o = 0; o < inode.presetValues.length;o++){
+              let checked = "";
+              if(o == value){
+                console.log(o);
+                checked = "checked";
+              }
+
+              contents += "<input type=\"radio\" id=\""+inode.presetValues[o]+"\" name=\"preset\" value\""+o+"\" "+checked+"></input>";
+              contents += "<label for=\""+inode.presetValues[o]+"\">"+inode.presetValues[o]+"</label><br>";
+
+            }
           }else{
-            contents += "<input type=\"text\" id=\""+inode.name+"\" name=\""+inode.name+"\" value=\""+value+"\"></input>";
+            contents += "<label for=\""+ inode.name +"\">"+inode.name+"</label> <br>";
+            contents += "<input type=\"text\" id=\""+inode.name+"\" name=\""+inode.name+"\" value=\""+value+"\"></input> <br>";
           }
 
         }
@@ -65,32 +86,73 @@ class ContextMenu{
       if(!isEditable){
         return;
       }
-      console.log(contents);
       contents += "<input type=\"submit\" value=\"Change\"></input>  </form>";
       document.getElementById("contextInner").innerHTML = contents;
-      document.getElementById("manipulateForm").onsubmit = this.onSubmit.bind(this);
-      
-      this.selected = parameter;
+      document.getElementById("manipulateForm").onsubmit = this.onSubmitManipulate.bind(this);
+
 
     }else if(type=="create"){
-      document.getElementById("contextInner").innerHTML = "create node: <br> here";
+      let contents = "create node: <br> <form id=\"createForm\">";
+
+      for(const [key,template] of GraphNode.nodeTemplates){
+
+        contents += "<input type=\"radio\" id=\""+template.name+"\" name=\"create\" value=\""+template.name+"\"></input>";
+        contents += "<label for=\""+ template.name+"\">"+template.name +"</label><br>";
+      }
+
+      contents += "<input type=\"submit\" value=\"Create\"></input> </form>";
+      document.getElementById("contextInner").innerHTML = contents;
+      document.getElementById("createForm").onsubmit = this.onSubmitCreate.bind(this);
       this.position=parameter;
     }
   }
 
-  onSubmit(){
+  onSubmitManipulate(){
     for(const inode of this.selected.template.inputNodes){
-      if(inode.IOType == "color"){
+      if(this.nodeProperties.get(inode.name).hasConnection){
+        //nothing to do
+      }
+      else if(inode.IOType == "color"){
         let color = hexadecimalToRGB(document.getElementById(inode.name).value);
         color.push(parseInt(document.getElementById("alpha").value));
-        this.ui.graph.modifyDefault(this.selected,this.nodeIDs.get(inode.name),color);
+        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,color);
+      }else if(inode.presetValues != null){
+        for(let i = 0; i < inode.presetValues.length; i++){
+          if(document.getElementById(inode.presetValues[i]).checked){
+            this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[i]);
+          }
+
+        }
       }else{
-        this.ui.graph.modifyDefault(this.selected,this.nodeIDs.get(inode.name),[document.getElementById(inode.name).value]);
+        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[document.getElementById(inode.name).value]);
       }
 
     }
     this.ui.process();
     return false;
+  }
+
+  onSubmitCreate(){
+      for(const [key,template] of GraphNode.nodeTemplates){
+        if(document.getElementById(template.name).checked){
+          this.ui.graph.addNamedNode(template.name, this.position);
+        }
+      }
+      this.ui.draw();
+      this.position.x += 10;
+      this.position.y += 10;
+      return false;
+  }
+
+  draw(){
+    if(this.type == "create"){
+      let rectWidth = 5;
+      let rectHeight = 20;
+      let context = this.ui.context;
+      context.fillStyle = "rgb(100,150,150)";
+      context.fillRect(this.position.x-rectWidth/this.ui.scale/2,this.position.y-rectHeight/this.ui.scale/2,rectWidth/this.ui.scale,rectHeight/this.ui.scale);
+      context.fillRect(this.position.x-rectHeight/this.ui.scale/2,this.position.y-rectWidth/this.ui.scale/2,rectHeight/this.ui.scale,rectWidth/this.ui.scale);
+    }
   }
 }
 
@@ -110,21 +172,22 @@ class UI{
     contextMenu;
     background = new Image();
   
-    constructor(graph, canvas){
+    constructor(graph, canvas,context){
       this.contextMenu = new ContextMenu("default",null,this);
 
       this.graph = graph;
       this.canvas = canvas;
-      this.context = canvas.getContext("2d");
+      this.context = context;
   
       this.canvas.height = 600;
-      this.canvas.width = 600;
+      this.canvas.width = 1000;
   
       this.canvas.addEventListener('mousedown',this.mouseDown.bind(this), false);
       this.canvas.addEventListener('mouseup',this.mouseUp.bind(this), false);
       this.canvas.addEventListener('mousemove',this.mouseMove.bind(this), false);
       this.canvas.addEventListener('wheel',this.wheel.bind(this), false);
       this.canvas.addEventListener('dblclick',this.dblClick.bind(this), false);
+      this.canvas.addEventListener('keydown',this.keydown.bind(this), false);
       this.process();
       let draw= this.draw.bind(this);
       this.background.onload = ()=>{
@@ -150,22 +213,54 @@ class UI{
       return Vec2(evt.clientX - rect.left, evt.clientY - rect.top);
     }
   
-  
+    #changeContextMenu(type, parameter){
+
+      if(this.contextMenu.selected != null){
+        this.contextMenu.selected.selected = false;
+      }
+      
+
+      this.contextMenu = new ContextMenu(type,parameter,this);
+    }
+
     async process(){
       let data;
       let response = fetch("/process",{method:"POST"}).then(response=>{response.blob().then(blobResponse => {this.background.src=window.URL.createObjectURL(blobResponse);});});
+    }
+
+    #drawTransparencyBackground(){
+      
+      let xDim = this.canvas.width/30;
+      let yDim = this.canvas.height/30;
+      for(let i = 0; i<xDim+1; i++){
+        for(let o = 0; o<yDim+1; o++){
+          if((i %2==0 && o %2!=0)||(i %2!=0 && o %2==0)){
+            this.context.fillStyle = "rgb(125,125,125)";
+          }else{
+            this.context.fillStyle = "rgb(200,200,200)";
+          }
+          this.context.fillRect(i*30,o*30,30,30);
+        }
+      }
     }
   
     draw(){
       this.context.save();
       this.context.setTransform(1,0,0,1,0,0);
       this.context.clearRect(0,0,this.canvas.width,this.canvas.height);
+      this.#drawTransparencyBackground();
       //draw background image
-      this.context.drawImage(this.background,0,0,this.canvas.width,this.canvas.height);
+      if(this.background.width > this.background.height){
+        this.context.drawImage(this.background,0,(this.canvas.height-this.background.height*(this.canvas.width/this.background.width))/2,this.canvas.width,this.background.height*(this.canvas.width/this.background.width));
+      }else{
+        this.context.drawImage(this.background,(this.canvas.width-this.background.width*(this.canvas.height/this.background.height))/2,0,this.background.width*(this.canvas.height/this.background.height),this.canvas.height);
+      }
+
       this.context.restore();
   
   
       this.graph.draw(this.context);
+      this.contextMenu.draw();
     }
   
     async mouseDown(evt){
@@ -179,10 +274,12 @@ class UI{
         if(this.selecting != null){
 
           if(this.selecting.type == "node"){
-            this.contextMenu = new ContextMenu("manipulate",this.selecting.node,this);
+            
+            this.#changeContextMenu("manipulate",this.selecting.node);
           }
 
           if(this.selecting.type == "input"){
+            this.#changeContextMenu("default",null);
             let manipulatedLine = this.graph.getLineByInput(this.selecting.node.id,this.selecting.IOSocket);
             if(manipulatedLine != null){
               this.graph.removeLine(manipulatedLine);
@@ -304,26 +401,30 @@ class UI{
       // Normalize mouse wheel movement to +1 or -1 to avoid unusual jumps.
       const wheel = evt.deltaY < 0 ? 1 : -1;
       
-      let mousePos = this.#getMousePos(evt);
+
+      if(!((this.scale > 10 && wheel == 1)||(this.scale<0.1 && wheel == -1))){
+        let mousePos = this.#getMousePos(evt);
   
-      const zoom = Math.exp(wheel * 0.2);
-      this.#translate(this.origin.x,this.origin.y);
-  
-      // Compute the new visible origin. Originally the mouse is at a
-      // distance mouse/scale from the corner, we want the point under
-      // the mouse to remain in the same place after the zoom, but this
-      // is at mouse/new_scale away from the corner. Therefore we need to
-      // shift the origin (coordinates of the corner) to account for this.
-      //let transformed = graph.getTransformedMouse(mousePos);
-      this.origin.x -= mousePos.x/(this.scale*zoom) - mousePos.x/this.scale;
-      this.origin.y -= mousePos.y/(this.scale*zoom) - mousePos.y/this.scale;
-  
-      this.#scale(zoom);
-      this.#translate(-this.origin.x,-this.origin.y);
-  
-  
-  
-      this.draw();
+        const zoom = Math.exp(wheel * 0.2);
+
+        this.#translate(this.origin.x,this.origin.y);
+    
+        // Compute the new visible origin. Originally the mouse is at a
+        // distance mouse/scale from the corner, we want the point under
+        // the mouse to remain in the same place after the zoom, but this
+        // is at mouse/new_scale away from the corner. Therefore we need to
+        // shift the origin (coordinates of the corner) to account for this.
+        //let transformed = graph.getTransformedMouse(mousePos);
+        this.origin.x -= mousePos.x/(this.scale*zoom) - mousePos.x/this.scale;
+        this.origin.y -= mousePos.y/(this.scale*zoom) - mousePos.y/this.scale;
+    
+        this.#scale(zoom);
+        this.#translate(-this.origin.x,-this.origin.y);
+    
+    
+    
+        this.draw();
+      }
     }
   
     dblClick(evt){
@@ -332,9 +433,16 @@ class UI{
       let transformed = this.graph.getTransformedPos(mousePos);
       //let transformed = Vec2(mousePos.x*transform.a+mousePos.y*transform.c + transform.e, mousePos.x*transform.b+mousePos.y*transform.d+transform.f);
       transformed.z = 1;
-      this.contextMenu = new ContextMenu("create",transformed,this);
-      this.graph.addNamedNode("Color to image", transformed);
+      this.#changeContextMenu("create",transformed);
       this.draw();
+    }
+
+    keydown(evt){
+      let code = evt.keyCode;
+      switch(code){
+        case 88: if(this.selecting != null && this.selecting.node.id != 0){this.#changeContextMenu("default",null); this.graph.removeNode(this.selecting.node.id); this.process()};
+        default: ;
+      }
     }
   
   }

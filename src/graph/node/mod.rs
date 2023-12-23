@@ -15,12 +15,19 @@ use thiserror::Error;
 use image::{RgbaImage, Rgba};
 
 
+#[derive(Serialize)]
+pub enum NodeIOSubtypes{
+    ColorCurves,
+    FilePath
+}
+
 pub struct NodeInputOptions{
     pub IOType : NodeIOType,
     pub canAlterDefault: bool,
     pub hasConnection:bool,
     pub name : String,
-    pub presetValues : Option<Vec<String>>
+    pub presetValues : Option<Vec<String>>,
+    pub subtype: Option<NodeIOSubtypes>
 }
 
 pub struct NodeOutputOptions{
@@ -49,6 +56,7 @@ impl Serialize for NodeInputOptions{
         state.serialize_field("hasConnection", &self.hasConnection)?;
         state.serialize_field("name", &self.name)?;
         state.serialize_field("presetValues", &self.presetValues)?;
+        state.serialize_field("subtype", &self.subtype)?;
         state.end()
     }
 }
