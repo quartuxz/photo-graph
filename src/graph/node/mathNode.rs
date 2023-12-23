@@ -65,7 +65,7 @@ impl Node for MathNode{
 
     fn get(&mut self, index: u16) -> NodeResult<NodeIOType> {
         self.generate_output_errors(&index)?;
-        if(!self.buffered){
+        if !self.buffered {
             match self.operation{
                 0 => self.buffer = self.x+self.y,
                 1 => self.buffer = self.x-self.y,

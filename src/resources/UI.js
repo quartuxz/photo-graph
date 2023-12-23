@@ -224,8 +224,14 @@ class UI{
     }
 
     async process(){
-      let data;
-      let response = fetch("/process",{method:"POST"}).then(response=>{response.blob().then(blobResponse => {this.background.src=window.URL.createObjectURL(blobResponse);});});
+      const options = {
+        method: "POST",
+        headers: {
+          "Content-Type": "text",
+        },
+        body: graphID.toString()
+      };
+      fetch("/process",options).then(response=>{response.blob().then(blobResponse => {this.background.src=window.URL.createObjectURL(blobResponse);});});
     }
 
     #drawTransparencyBackground(){

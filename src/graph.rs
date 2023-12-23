@@ -2,8 +2,8 @@ pub mod node;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use std::{collections::HashMap, hash::Hash, fmt};
-use crate::graph::node::{imageInputNode, NodeStatic, floatLiteralNode::FloatLiteralNode};
+use std::{collections::HashMap, fmt};
+use crate::graph::node::{NodeStatic};
 
 use self::node::{Node, NodeIOType, NodeInputOptions};
 use image::RgbaImage;
@@ -19,8 +19,8 @@ pub struct Edge{
 
 #[derive(Serialize,Deserialize, Clone)]
 pub struct Command{
-    name : String,
-    args : Vec<String>
+    pub name : String,
+    pub args : Vec<String>
 }
 
 impl fmt::Display for Command{
@@ -35,7 +35,17 @@ impl fmt::Display for Command{
 }
 
 
-pub type Commands = Vec<Command>;
+#[derive(Serialize,Deserialize, Clone)]
+pub struct Commands{
+    pub commands : Vec<Command>,
+    pub graphID : u64
+}
+
+impl Commands{
+    fn new()->Commands{
+        Commands{commands:vec![],graphID:0}
+    }
+}
 
 //a literal is a node without inputs
 //every node's input can have exactly one output that maps to it through an edge
@@ -81,7 +91,7 @@ impl Graph{
         while includes {
             includes = false;
             for edge in & mut self.edges{
-                if(edge.0 == layer){
+                if edge.0 == layer {
                     let val = self.nodes.get_mut(&edge.1.outputNode).unwrap().get(edge.1.outputIndex).unwrap();
                     self.nodes.get_mut(&edge.1.inputNode).unwrap().set(edge.1.inputIndex, val).unwrap();
                     includes = true;
@@ -91,7 +101,7 @@ impl Graph{
             layer+=1;
         }
 
-        for (key, value) in &mut self.nodes{
+        for (_key, value) in &mut self.nodes{
             value.clear_buffers();
         }
         
@@ -123,7 +133,7 @@ impl Graph{
             }
 
             for forward_edge in &new_forward_edges_to_check{
-                if(**forward_edge == *edge){
+                if **forward_edge == *edge {
                     return true;
                 }
             }
@@ -170,17 +180,17 @@ impl Graph{
     fn add_edge(&mut self, edge:Edge)->GraphResult<()>{
 
         //checks if the nodes have outputs/inputs at given indices
-        if(self.nodes[&(edge.inputNode as usize)].get_inputs().len() < (edge.inputIndex as usize) || self.nodes[&(edge.outputNode as usize)].get_outputs().len() < (edge.outputIndex as usize)){
+        if self.nodes[&(edge.inputNode as usize)].get_inputs().len() < (edge.inputIndex as usize) || self.nodes[&(edge.outputNode as usize)].get_outputs().len() < (edge.outputIndex as usize) {
             return GraphResult::Err(GraphError::MismatchedNodes);
         }
         //checks if the nodes can be connected with equivalent types
-        if(std::mem::discriminant(&self.nodes[&(edge.inputNode as usize)].get_inputs()[edge.inputIndex as usize].IOType) != std::mem::discriminant(&self.nodes[&(edge.outputNode as usize)].get_outputs()[edge.outputIndex as usize].IOType)){
+        if std::mem::discriminant(&self.nodes[&(edge.inputNode as usize)].get_inputs()[edge.inputIndex as usize].IOType) != std::mem::discriminant(&self.nodes[&(edge.outputNode as usize)].get_outputs()[edge.outputIndex as usize].IOType) {
             return GraphResult::Err(GraphError::MismatchedNodes);
         }
         let mut removed:Option<Edge> = None;
         //removes old edge at input index and node
         for i in 0..self.edges.len(){
-            if(self.edges[i].1.inputNode == edge.inputNode && self.edges[i].1.inputIndex == edge.inputIndex){
+            if self.edges[i].1.inputNode == edge.inputNode && self.edges[i].1.inputIndex == edge.inputIndex {
 
                 let (_,removed_edge) = self.edges.remove(i);
                 removed = Some(removed_edge);
@@ -208,14 +218,14 @@ impl Graph{
     //an edge to remove and a bool indicating wether an expensive layer recalculation is need to update the order in which the nodes are used
     fn remove_edge_and_replace_with_default(&mut self, edge:&Edge, recalculate :bool)->GraphResult<()>{
         for thisEdge in &mut self.edges {
-                if(thisEdge.1 == *edge){
+                if thisEdge.1 == *edge {
                     //replace the removed edge with one that connects the now empty input to the output of the default literal node
                     for i in &self.defaultInputEdges[&edge.inputNode] {
                         if i.inputIndex == edge.inputIndex {
                             thisEdge.1 = i.clone();
                         }
                     }
-                    if(recalculate){
+                    if recalculate {
                         self.recalculate_layers();
                     }
                     return GraphResult::Ok(());
@@ -288,7 +298,7 @@ impl Graph{
     }
 
     pub fn new()->Self{
-        let mut graph=Graph { nodes : HashMap::new(), edges : vec![], defaultInputEdges : HashMap::new(), commandHistory: vec![], IDCount:0};
+        let mut graph=Graph { nodes : HashMap::new(), edges : vec![], defaultInputEdges : HashMap::new(), commandHistory: Commands::new(), IDCount:0};
         graph.add_node(Box::new(node::finalNode::FinalNode::new()));
         //graph.add_node(Box::new(node::imageInputNode::ImageInputNode::new()));
         //graph.add_edge(Edge{inputIndex:0,outputIndex:0,inputNode:0,outputNode:2}).unwrap();
@@ -296,7 +306,7 @@ impl Graph{
     }
 
     pub fn execute_commands(&mut self, mut commands:Commands)->GraphResult<()>{
-        for cmd in &commands{
+        for cmd in &commands.commands{
             println!("{}",cmd);
             match cmd.name.as_str(){
                 "removeEdge" => self.remove_edge_and_replace_with_default(&Edge {outputNode:cmd.args[0].parse().unwrap(),outputIndex:cmd.args[1].parse().unwrap(),inputNode:cmd.args[2].parse().unwrap(),inputIndex:cmd.args[3].parse().unwrap()}, true)?,
@@ -331,7 +341,7 @@ impl Graph{
                         }
                         else if nodeName == node::colorLiteralNode::ColorLiteralNode::get_node_name_static(){
                             let mut channels : [u8;4] = [0;4];
-                            for i in (0..4){
+                            for i in 0..4 {
                                 channels[i] = match cmd.args[i+1].parse(){
                                     Ok(parsed) => parsed,
                                     Err(_) => return Err(GraphError::IllFormedCommand)
@@ -345,7 +355,7 @@ impl Graph{
                 _ => return Err(GraphError::UnknownCommand)
             }
         }
-        self.commandHistory.append(&mut commands);
+        self.commandHistory.commands.append(&mut commands.commands);
         Ok(())
     }
 }

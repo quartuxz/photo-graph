@@ -57,7 +57,7 @@ impl Node for ImageInputNode{
 
     fn get(&mut self, index: u16) -> NodeResult<NodeIOType> {
         self.generate_output_errors(&index)?;
-        if(!self.buffered){
+        if !self.buffered {
             self.retrieve_image();
             self.buffered =true;
         }

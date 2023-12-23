@@ -3,7 +3,7 @@ mod graph;
 extern crate lazy_static;
 
 use std::fs::File;
-use std::hash::Hash;
+
 use std::io::Cursor;
 use std::{fs, collections::HashMap,io::Write};
 use std::sync::Mutex;
@@ -15,8 +15,8 @@ lazy_static!{
 
 
 use actix_web::web::Json;
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, HttpRequest, http::{StatusCode, header::{CacheControl, CacheDirective}}};
-use actix_files::Files;
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, HttpRequest, http::{header::{CacheControl, CacheDirective}}};
+
 use graph::Graph;
 use serde::Deserialize;
 
@@ -57,9 +57,9 @@ async fn load_graph(data: web::Data<AppState>, body:web::Bytes)->impl Responder{
     HttpResponse::Ok().content_type("text").body((*currentID-1).to_string())
 }
 
-#[get("/retrieveGraph")]
+#[post("/retrieveGraph")]
 async fn retrieve_graph(data: web::Data<AppState>, body:web::Bytes)->impl Responder{
-    let mut graphs = data.graphs.lock().unwrap();
+    let graphs = data.graphs.lock().unwrap();
 
     HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&graphs.get(&(String::from_utf8(body.to_vec()).unwrap()).parse().unwrap()).unwrap().commandHistory).unwrap())
 }
@@ -72,17 +72,17 @@ struct SaveInfo{
 
 #[post("/saveGraph")]
 async fn save_graph(data: web::Data<AppState>, saveInfo:Json<SaveInfo>)->impl Responder{
-    let mut graphs = data.graphs.lock().unwrap();
+    let graphs = data.graphs.lock().unwrap();
     let mut output = File::create(RESOURCE_PATH.clone()+r"\graphs\"+&saveInfo.fileName).unwrap();
     write!(output,"{}",serde_json::to_string(&graphs.get(&saveInfo.graphID).unwrap().commandHistory).unwrap()).unwrap();
     HttpResponse::Ok()
 }
 
 #[post("/createGraph")]
-async fn create_graph(data: web::Data<AppState>, body:web::Bytes)->impl Responder{
+async fn create_graph(data: web::Data<AppState>)->impl Responder{
     let mut graphs = data.graphs.lock().unwrap();
     let mut currentID = data.currentID.lock().unwrap();
-    let mut newGraph = Graph::new();
+    let newGraph = Graph::new();
     graphs.insert(*currentID, newGraph);
     *currentID += 1;
     HttpResponse::Ok().content_type("text").body((*currentID-1).to_string())
@@ -93,6 +93,12 @@ async fn graph_selector_html()-> impl Responder{
     let contents = fs::read_to_string(RESOURCE_PATH.clone()+"graph_selector.html").unwrap();
 
     HttpResponse::Ok().content_type("text/html").body(contents)
+}
+
+#[get("/utils.js")]
+async fn utils_javascript()->impl Responder{
+    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"utils.js").unwrap();
+    HttpResponse::Ok().content_type("text/javascript").body(contents)
 }
 
 #[get("/graph_selector.js")]
@@ -169,10 +175,11 @@ async fn graph_page_javascript_graph()-> impl Responder {
     HttpResponse::Ok().content_type("text/javascript").body(contents)
 }
 
+
 #[post("/process")]
-async fn process_graph(data: web::Data<AppState>)-> impl Responder {
+async fn process_graph(data: web::Data<AppState>, body:web::Bytes)-> impl Responder {
     let mut graphs = data.graphs.lock().unwrap();
-    let mut outputImage = graphs.get_mut(&0).unwrap().process();
+    let outputImage = graphs.get_mut(&(String::from_utf8(body.to_vec()).unwrap()).parse().unwrap()).unwrap().process();
     //outputImage.save(RESOURCE_PATH.clone()+r"images\output_0.png").unwrap();
     let mut bytes: Vec<u8> = Vec::new();
     outputImage.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png).unwrap();
@@ -184,7 +191,7 @@ async fn process_graph(data: web::Data<AppState>)-> impl Responder {
 #[post("/command")]
 async fn command_graph(data: web::Data<AppState>, commands: Json<graph::Commands>)-> impl Responder{
     let mut graphs = data.graphs.lock().unwrap();
-    HttpResponse::Ok().content_type("text").body(match graphs.get_mut(&0).unwrap().execute_commands(commands.clone()).err(){
+    HttpResponse::Ok().content_type("text").body(match graphs.get_mut(&commands.graphID).unwrap().execute_commands(commands.clone()).err(){
         Some(error) => match error{
             graph::GraphError::Cycle=>"cycle",
             graph::GraphError::EdgeNotFound => "edge not found",
@@ -214,7 +221,7 @@ struct Info{
     name:String
 }
 
-async fn images(req: HttpRequest, info: web::Path<Info>) -> impl Responder {
+async fn images(_req: HttpRequest, info: web::Path<Info>) -> impl Responder {
 
     let name = info.name.clone();
     HttpResponse::Ok()
@@ -236,6 +243,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(appState.clone())
+            .service(utils_javascript)
             .service(retrieve_graph)
             .service(save_graph)
             .service(load_graph)

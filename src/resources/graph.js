@@ -1,3 +1,7 @@
+let graphID = Number(getCookie("graphID"));
+let graphFile = getCookie("graphFile");
+
+
 
 let graphFontStyle = "15px seif";
 
@@ -287,7 +291,8 @@ class NodeIO{
     #currentID = 0;
     #context;
   
-    constructor(context){
+    constructor(context,graphID){
+
       this.#context = context;
       this.#_addNode(new GraphNode("Final",Vec2(0,0),this.#context));
     }
@@ -394,12 +399,13 @@ class NodeIO{
     
     async #registerCommands(commands){
         //commands are sent to be executed server-side
+        let body = {commands:commands, graphID:graphID};
         const options = {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(commands)
+          body: JSON.stringify(body)
         };
         let response = await fetch("/command", options);
         let final = await response.text();
@@ -411,9 +417,9 @@ class NodeIO{
         return true;
     }
 
-    #interpretCommands(commands){
+    interpretCommands(commands){
       //commands need to be executed client-side
-      
+      console.log(commands);
     }
 
     registerNodeMoveCommand(nodeID, delta){

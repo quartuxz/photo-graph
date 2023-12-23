@@ -1,5 +1,5 @@
 use super::*;
-use image::{DynamicImage, ImageBuffer};
+use image::{ImageBuffer};
 
 pub struct ColorToImageNode{
     color: Rgba<u8>,
@@ -53,13 +53,13 @@ impl Node for ColorToImageNode{
                 self.color = color;
             }
             1 => if let NodeIOType::FloatType(mut float) = value{
-                if(float < 1.0){
+                if float < 1.0 {
                     float = 1.0;
                 }
                 self.width = float as u32;
             }
             2 => if let NodeIOType::FloatType(mut float) = value{
-                if(float < 1.0){
+                if float < 1.0 {
                     float = 1.0;
                 }
                 self.height = float as u32;
@@ -73,8 +73,8 @@ impl Node for ColorToImageNode{
 
     fn get(&mut self, index: u16) -> NodeResult<NodeIOType> {
         self.generate_output_errors(&index)?;
-        if(!self.buffered){
-            self.buffer = ImageBuffer::from_fn(self.width, self.height, |x,y| {self.color});
+        if !self.buffered {
+            self.buffer = ImageBuffer::from_fn(self.width, self.height, |_x,_y| {self.color});
             self.buffered =true;
         }
 

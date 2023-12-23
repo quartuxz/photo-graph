@@ -9,8 +9,8 @@ pub mod rotationNode;
 pub mod mathNode;
 pub mod colorToImageNode;
 
-use std::{vec, result, fmt, collections::HashMap};
-use serde::{Serialize, Deserialize, Serializer, ser::SerializeStruct};
+use std::{vec, result, fmt};
+use serde::{Serialize, Serializer, ser::SerializeStruct};
 use thiserror::Error;
 use image::{RgbaImage, Rgba};
 
@@ -179,14 +179,14 @@ pub trait NodeDefaults: Send+Sync{
 pub trait Node: Send + Sync + NodeDefaults + NodeStatic{
     
     fn generate_output_errors(&self, index:&u16)->NodeResult<()>{
-        if(self.get_outputs().len() < (*index as usize)){
+        if self.get_outputs().len() < (*index as usize) {
             return NodeResult::Err(NodeError::InvalidOutputIndex(self.get_node_name(), *index));
         }
         return NodeResult::Ok(())
     }
 
     fn generate_input_errors(&self, index:&u16, value:&NodeIOType)->NodeResult<()>{
-        if(self.get_inputs().len() < (*index as usize)){
+        if self.get_inputs().len() < (*index as usize) {
             return NodeResult::Err(NodeError::InvalidInput(self.get_node_name(), value.clone(), *index));
         }
         if std::mem::discriminant(value) != std::mem::discriminant(&self.get_inputs()[*index as usize].IOType){
@@ -201,11 +201,11 @@ pub trait Node: Send + Sync + NodeDefaults + NodeStatic{
 
     }
 
-    fn get(&mut self, index: u16) -> NodeResult<NodeIOType>{
+    fn get(&mut self, _index: u16) -> NodeResult<NodeIOType>{
         NodeResult::Err(NodeError::NoOutput(self.get_node_name()))
     }
 
-    fn set(&mut self, index: u16, value:NodeIOType) -> NodeResult<()>{
+    fn set(&mut self, _index: u16, _value:NodeIOType) -> NodeResult<()>{
         NodeResult::Err(NodeError::NoInput(self.get_node_name()))
     }
 
