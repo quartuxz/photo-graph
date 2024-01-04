@@ -12,8 +12,6 @@ function saveOnclick(){
   return true;
 }
 
-console.log(graphID);
-console.log(graphFile);
 
 async function main(){
   
@@ -34,6 +32,9 @@ async function main(){
   };
   let response = await fetch("/retrieveGraph", options);
   let commandHistory = await response.json();
+  if(commandHistory.isValid == "no" || graphFile == ""){
+    window.location.href = domainName;
+  }
   graph.interpretCommands(commandHistory);
 
   let ui = new UI(graph,canvas, context);

@@ -63,7 +63,6 @@ class NodeIO{
       
 
 
-
       const template = GraphNode.nodeTemplates.get(nodeName);
       let widths = [100,this.#context.measureText(template.name).width+20];
       this.template = template;
@@ -281,6 +280,10 @@ class NodeIO{
     commandForm(){
       return [this.fromID.toString(),this.fromSocket.toString(),this.toID.toString(),this.toSocket.toString()];
     }
+
+    static parseCommand(command){
+      return new Line(Number(command.args[0]),Number(command.args[1]),Number(command.args[2]),Number(command.args[3]));
+    }
   }
 
   class Graph{
@@ -339,14 +342,18 @@ class NodeIO{
       this.#_addNode(new GraphNode(nodeName,position,this.#context));
     }
 
-    #_removeNode(id){
+    getNodeIndex(id){
       let toRemovePos = -1;
       for(let i = 0; i< this.#nodes.length;i++){
         if(this.#nodes[i].id == id){
           toRemovePos=i;
         }
       }
-      this.#nodes.splice(toRemovePos,1);
+      return toRemovePos;
+    }
+
+    #_removeNode(id){
+      this.#nodes.splice(this.getNodeIndex(id),1);
       let toRemove = [];
       for(const line of this.#lines){
         if(line.toID == id || line.fromID == id){
@@ -366,15 +373,14 @@ class NodeIO{
     #_modifyDefault(node, nodeID,parameters){
       //parameters is greater than 1 if we are dealing with a 4-channel color
       if(parameters.length > 1){
-        console.log(parameters);
         node.defaultValues[nodeID-node.id-1] = parameters;
       }else{
         node.defaultValues[nodeID-node.id-1] = parameters[0];
       }
     }
-
+    //the node whose default value is being modified, the nodeID of the default value and the parameters being changed(could be a number a string or a 4-value array for color)
     modifyDefault(node, nodeID,parameters){
-      let args = [nodeID.toString()];
+      let args = [nodeID.toString(),node.id.toString()];
       for(const parameter of parameters){
         args.push(parameter.toString());
       }
@@ -409,7 +415,6 @@ class NodeIO{
         };
         let response = await fetch("/command", options);
         let final = await response.text();
-        console.log(final);
         if(final != "ok"){
 
           return false;
@@ -419,7 +424,30 @@ class NodeIO{
 
     interpretCommands(commands){
       //commands need to be executed client-side
-      console.log(commands);
+      for(const command of commands.commands){
+        switch(command.name){
+          
+          case "moveNode": this.#nodes[this.getNodeIndex(Number(command.args[0]))].objectTransform(Mat3.translate(Number(command.args[1]),Number(command.args[2]))); break;
+          case "addNode": this.#_addNode(new GraphNode(command.args[0],Vec2(Number(command.args[1]),Number(command.args[2])), this.#context)); break;
+          case "addEdge": this.#_addLine(Line.parseCommand(command)); break;
+          case "removeEdge": this.#_removeLine(Line.parseCommand(command)); break;
+          case "removeNode": this.#_removeNode(Number(command.args[0])); break;
+          case "modifyDefault": {
+              let parameters=[];
+              let node = this.#nodes[this.getNodeIndex(Number(command.args[1]))];
+              let defaultNodeID = Number(command.args[0]);
+              switch(node.template.inputNodes[defaultNodeID-node.id-1].IOType){
+                case "int": parameters.push(Number(command.args[2])); break;
+                case "float": parameters.push(Number(command.args[2])); break;
+                case "string": parameters.push(command.args[2]); break;
+                case "color": parameters = [Number(command.args[2]),Number(command.args[3]),Number(command.args[4]),Number(command.args[5])]; break;
+              }
+              this.#_modifyDefault(node, defaultNodeID,parameters);
+              break;
+            };
+          default: throw new Error("command not recognized!"); break;
+        }
+      }
     }
 
     registerNodeMoveCommand(nodeID, delta){

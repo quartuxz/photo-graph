@@ -22,7 +22,8 @@ async function onsubmitCreateForm(){
     await fetch("/saveGraph", options2);
     setCookie("graphFile",graphFile,2);
     setCookie("graphID",graphID,2);
-    window.location.href = window.location.href.split("/")[0]+"/graph";
+    
+    window.location.href = domainName+"graph";
 
 }
 
@@ -51,7 +52,7 @@ function onsubmitLoadForm(){
                 let graphID = Number(await response.text());
                 setCookie("graphFile",graphFile,2);
                 setCookie("graphID",graphID,2);
-                window.location.href = window.location.href.split("/")[0]+"/graph";
+                window.location.href = domainName+"graph";
             }
         }
     };

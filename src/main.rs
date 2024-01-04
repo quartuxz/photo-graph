@@ -22,6 +22,14 @@ use serde::Deserialize;
 
 use crate::graph::node::NodeStatic;
 
+use argon2::{
+    password_hash::{
+        rand_core::OsRng,
+        PasswordHash, PasswordHasher, PasswordVerifier, SaltString
+    },
+    Argon2
+};
+
 
 #[derive(Deserialize)]
 struct param{
@@ -60,7 +68,9 @@ async fn load_graph(data: web::Data<AppState>, body:web::Bytes)->impl Responder{
 #[post("/retrieveGraph")]
 async fn retrieve_graph(data: web::Data<AppState>, body:web::Bytes)->impl Responder{
     let graphs = data.graphs.lock().unwrap();
-
+    if(!graphs.contains_key(&(String::from_utf8(body.to_vec()).unwrap()).parse().unwrap())){
+        return HttpResponse::Ok().content_type("application/json").body("{\"isValid\":\"no\"}");
+    }
     HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&graphs.get(&(String::from_utf8(body.to_vec()).unwrap()).parse().unwrap()).unwrap().commandHistory).unwrap())
 }
 
@@ -232,7 +242,6 @@ async fn images(_req: HttpRequest, info: web::Path<Info>) -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-
 
     let mut graphs = HashMap::new();
     graphs.insert(0, Graph::new());

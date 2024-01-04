@@ -325,24 +325,24 @@ impl Graph{
                     Some(node) => {
                         let nodeName = node.get_node_name();
                         if nodeName == node::floatLiteralNode::FloatLiteralNode::get_node_name_static(){
-                            self.nodes.insert(cmd.args[0].parse().unwrap(), Box::new(node::floatLiteralNode::FloatLiteralNode::new(match cmd.args[1].parse(){
+                            self.nodes.insert(cmd.args[0].parse().unwrap(), Box::new(node::floatLiteralNode::FloatLiteralNode::new(match cmd.args[2].parse(){
                                 Ok(parsed) => parsed,
                                 Err(_) => return Err(GraphError::IllFormedCommand)
                             })));
                         }
                         else if nodeName == node::intLiteralNode::IntLiteralNode::get_node_name_static(){
-                            self.nodes.insert(cmd.args[0].parse().unwrap(), Box::new(node::intLiteralNode::IntLiteralNode::new(match cmd.args[1].parse(){
+                            self.nodes.insert(cmd.args[0].parse().unwrap(), Box::new(node::intLiteralNode::IntLiteralNode::new(match cmd.args[2].parse(){
                                 Ok(parsed) => parsed,
                                 Err(_) => return Err(GraphError::IllFormedCommand)
                             })));
                         }
                         else if nodeName == node::stringLiteralNode::StringLiteralNode::get_node_name_static(){
-                            self.nodes.insert(cmd.args[0].parse().unwrap(), Box::new(node::stringLiteralNode::StringLiteralNode::new(cmd.args[1].clone())));
+                            self.nodes.insert(cmd.args[0].parse().unwrap(), Box::new(node::stringLiteralNode::StringLiteralNode::new(cmd.args[2].clone())));
                         }
                         else if nodeName == node::colorLiteralNode::ColorLiteralNode::get_node_name_static(){
                             let mut channels : [u8;4] = [0;4];
                             for i in 0..4 {
-                                channels[i] = match cmd.args[i+1].parse(){
+                                channels[i] = match cmd.args[i+2].parse(){
                                     Ok(parsed) => parsed,
                                     Err(_) => return Err(GraphError::IllFormedCommand)
                                 }
