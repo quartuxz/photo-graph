@@ -35,17 +35,9 @@ impl fmt::Display for Command{
 }
 
 
-#[derive(Serialize,Deserialize, Clone)]
-pub struct Commands{
-    pub commands : Vec<Command>,
-    pub graphID : u64
-}
 
-impl Commands{
-    fn new()->Commands{
-        Commands{commands:vec![],graphID:0}
-    }
-}
+pub type Commands = Vec<Command>;
+
 
 //a literal is a node without inputs
 //every node's input can have exactly one output that maps to it through an edge
@@ -58,7 +50,8 @@ pub struct Graph{
     edges : Vec<(usize, Edge)>,
     IDCount : usize,
     defaultInputEdges: HashMap<usize, Vec<Edge>>,
-    pub commandHistory : Commands
+    commandHistory : Commands,
+    user : String
 
 }
 
@@ -82,6 +75,15 @@ pub enum GraphError{
 pub type GraphResult<T> = Result<T, GraphError>;
 
 impl Graph{
+
+    pub fn get_command_history(&self)->&Commands{
+        &self.commandHistory
+    }
+
+    pub fn get_user(&self)->String{
+        self.user.clone()
+    }
+
     //processes the final bitmap output for a graph.
     pub fn process(&mut self)->RgbaImage{
 
@@ -297,8 +299,8 @@ impl Graph{
         self.IDCount += index+1;
     }
 
-    pub fn new()->Self{
-        let mut graph=Graph { nodes : HashMap::new(), edges : vec![], defaultInputEdges : HashMap::new(), commandHistory: Commands::new(), IDCount:0};
+    pub fn new(user:String)->Self{
+        let mut graph=Graph { nodes : HashMap::new(), edges : vec![], defaultInputEdges : HashMap::new(), commandHistory: Commands::new(), IDCount:0, user};
         graph.add_node(Box::new(node::finalNode::FinalNode::new()));
         //graph.add_node(Box::new(node::imageInputNode::ImageInputNode::new()));
         //graph.add_edge(Edge{inputIndex:0,outputIndex:0,inputNode:0,outputNode:2}).unwrap();
@@ -306,7 +308,7 @@ impl Graph{
     }
 
     pub fn execute_commands(&mut self, mut commands:Commands)->GraphResult<()>{
-        for cmd in &commands.commands{
+        for cmd in &commands{
             println!("{}",cmd);
             match cmd.name.as_str(){
                 "removeEdge" => self.remove_edge_and_replace_with_default(&Edge {outputNode:cmd.args[0].parse().unwrap(),outputIndex:cmd.args[1].parse().unwrap(),inputNode:cmd.args[2].parse().unwrap(),inputIndex:cmd.args[3].parse().unwrap()}, true)?,
@@ -355,7 +357,7 @@ impl Graph{
                 _ => return Err(GraphError::UnknownCommand)
             }
         }
-        self.commandHistory.commands.append(&mut commands.commands);
+        self.commandHistory.append(&mut commands);
         Ok(())
     }
 }
@@ -366,13 +368,13 @@ mod tests{
 
     #[test]
     fn add_node_test(){
-        let mut graph = super::Graph::new();
+        let mut graph = super::Graph::new("".to_string());
         graph.add_node(Box::new(ImageInputNode::new()));
         assert_eq!(graph.edges[1].1, super::Edge{inputIndex:0,outputIndex:0,inputNode:2,outputNode:3});
     }
     #[test]
     fn simple_add_edge_test(){
-        let mut graph = super::Graph::new();
+        let mut graph = super::Graph::new("".to_string());
         graph.add_node(Box::new(ImageInputNode::new()));
         graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:0,outputNode:2}).unwrap();
         assert_eq!(graph.edges[1].1, super::Edge{inputIndex:0,outputIndex:0,inputNode:0,outputNode:2});
@@ -381,7 +383,7 @@ mod tests{
 
     #[test]
     fn remove_edge_test(){
-        let mut graph = super::Graph::new();
+        let mut graph = super::Graph::new("".to_string());
         graph.add_node(Box::new(ImageInputNode::new()));
         graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:0,outputNode:2}).unwrap();
         graph.remove_edge_and_replace_with_default(&super::Edge{inputIndex:0, outputIndex:0, inputNode:0,outputNode:2}, true).unwrap();
@@ -391,14 +393,14 @@ mod tests{
 
     #[test]
     fn simple_loop_check_test(){
-        let mut graph = super::Graph::new();
+        let mut graph = super::Graph::new("".to_string());
         let res = graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:0,outputNode:0});
         assert_eq!(res, Err(GraphError::Cycle));
     }
 
     #[test]
     fn loop_check_test(){
-        let mut graph = super::Graph::new();
+        let mut graph = super::Graph::new("".to_string());
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
@@ -408,7 +410,7 @@ mod tests{
         let res = graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:8,outputNode:2});
         assert_eq!(res, Err(GraphError::Cycle));
 
-        let mut graph = super::Graph::new();
+        let mut graph = super::Graph::new("".to_string());
         //2
         graph.add_node(Box::new(super::node::colorToImageNode::ColorToImageNode::new()));
         //6
@@ -435,7 +437,7 @@ mod tests{
 
     #[test]
     fn add_remove_edge_test(){
-        let mut graph = super::Graph::new();
+        let mut graph = super::Graph::new("".to_string());
         //2
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
         //5

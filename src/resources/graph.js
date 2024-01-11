@@ -424,7 +424,7 @@ class NodeIO{
 
     interpretCommands(commands){
       //commands need to be executed client-side
-      for(const command of commands.commands){
+      for(const command of commands){
         switch(command.name){
           
           case "moveNode": this.#nodes[this.getNodeIndex(Number(command.args[0]))].objectTransform(Mat3.translate(Number(command.args[1]),Number(command.args[2]))); break;

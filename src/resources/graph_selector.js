@@ -1,4 +1,6 @@
 
+console.log(getCookie("session"));
+
 let graphFiles = null;
 async function onsubmitCreateForm(){
     let graphFile = document.getElementById("graphName").value + ".graph"
