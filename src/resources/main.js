@@ -16,6 +16,7 @@ function saveOnclick(){
 async function main(){
   
   await GraphNode.loadNodeTemplates();
+  document.getElementById("top").insertAdjacentHTML("beforeend",graphFile);
   document.getElementById("saveButton").onclick = saveOnclick;
 
 
@@ -31,6 +32,7 @@ async function main(){
     body: graphID.toString()
   };
   let response = await fetch("/retrieveGraph", options);
+  if(response.status==401){window.location.href = domainName+"login";}
   let commandHistory = await response.json();
   if(commandHistory.isValid == "no" || graphFile == ""){
     window.location.href = domainName;

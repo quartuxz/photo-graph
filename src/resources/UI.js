@@ -231,7 +231,7 @@ class UI{
         },
         body: graphID.toString()
       };
-      fetch("/process",options).then(response=>{response.blob().then(blobResponse => {this.background.src=window.URL.createObjectURL(blobResponse);});});
+      fetch("/process",options).then(response=>{ if(response.status==401){window.location.href = domainName+"login";} response.blob().then(blobResponse => {this.background.src=window.URL.createObjectURL(blobResponse);});});
     }
 
     #drawTransparencyBackground(){

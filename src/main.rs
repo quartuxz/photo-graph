@@ -87,7 +87,7 @@ async fn authenticate(db:&sqlx::Pool<Sqlite>,userCred:&UserCredentials)->bool{
 
 
 
-fn get_username_from__encoded_claim(token:String)->Option<String>{
+fn get_username_from_token(token:String)->Option<String>{
 
     let mut validator = Validation::default();
     validator.leeway = 1;
@@ -107,8 +107,9 @@ fn get_username_from__encoded_claim(token:String)->Option<String>{
     return Some(token_data.claims.username);
 }
 
-async fn corroborate_claim(grph : &graph::Graph, encoded_claim:String)->bool{
-    let res = get_username_from__encoded_claim(encoded_claim);
+async fn corroborate_claim(grph : &graph::Graph, request: &HttpRequest)->bool{
+    let usernameToken = match request.cookie("session"){Some(val)=>val, None=> return false}.value().to_owned();
+    let res = get_username_from_token(usernameToken);
     match res{
         Some(username) => grph.get_user() == username,
         None => false
@@ -140,15 +141,7 @@ async fn create_account(data: web::Data<AppState>, userCred:Json<UserCredentials
         .execute(&data.db)
         .await
         .unwrap();
-    let user_results = sqlx::query_as::<_, User>("SELECT username, password_hash FROM users WHERE username=$1")
-        .bind(userCred.username.clone())
-        .fetch_all(&data.db)
-        .await
-        .unwrap();
 
-    if user_results.len() != 0{
-        println!("{0}, {1}", user_results[0].username, user_results[0].password_hash);
-    }
     HttpResponse::Ok().content_type("text").body("ok")
 }
 
@@ -193,35 +186,57 @@ async fn login(data: web::Data<AppState>, userCredentials:Json<UserCredentials>)
 
 
 #[get("/retrieveGraphFileList")]
-async fn retrieve_graph_file_list()->impl Responder{
-    let paths = fs::read_dir(RESOURCE_PATH.clone()+r"\graphs").unwrap();
+async fn retrieve_graph_file_list(request: HttpRequest,data: web::Data<AppState>)->impl Responder{
+    let username = match get_username_from_token(match request.cookie("session"){Some(val)=>val,None=>return HttpResponse::Unauthorized().into()}.value().to_owned()){Some(val)=>val, None=>return HttpResponse::Unauthorized().into()};
+    let results = sqlx::query("SELECT graphName FROM graphs WHERE username=$1")
+        .bind(username.clone())
+        .fetch_all(&data.db)
+        .await
+        .unwrap();
     let mut out = vec![];
-    for path in paths {
-        out.push(path.unwrap().file_name().to_str().unwrap().to_string());
+    for result in  results{
+        out.push(result.get::<String,&str>("graphName"));
     }
     HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&out).unwrap())
 }
 
 #[post("/loadGraph")]
-async fn load_graph(data: web::Data<AppState>, body:web::Bytes)->impl Responder{
+async fn load_graph(request: HttpRequest,data: web::Data<AppState>, body:web::Bytes)->impl Responder{
     let mut graphs = data.graphs.lock().unwrap();
     let mut currentID = data.currentID.lock().unwrap();
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+r"\graphs\"+&String::from_utf8(body.to_vec()).unwrap()).unwrap();
-
-    let mut loadedGraph = Graph::new("".to_string());
-    loadedGraph.execute_commands(serde_json::from_str(&contents).unwrap()).unwrap();
+    let username = match get_username_from_token(match request.cookie("session"){Some(val)=>val, None=>return HttpResponse::Unauthorized().into()}.value().to_owned()){
+        Some(value) => value,
+        None => return HttpResponse::Unauthorized().into()
+    };
+    let graphName = match String::from_utf8(body.to_vec()){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()};
+    let result = sqlx::query("SELECT graph FROM graphs WHERE username=$1 AND graphName=$2")
+        .bind(username.clone())
+        .bind(graphName.clone())
+        .fetch_all(&data.db)
+        .await
+        .unwrap();
+    let contents;
+    if(!result.is_empty()){
+        contents= result[0].get::<String,&str>("graph");
+    }else{
+        return HttpResponse::NotFound().body("graph not found");
+    }
+    //username is guaranteed to be valid because it was found in the database
+    let mut loadedGraph = Graph::new(username);
+    match loadedGraph.execute_commands(match serde_json::from_str(&contents){Ok(val)=>val, Err(_)=>return  HttpResponse::InternalServerError().into()}){Ok(_)=>(),Err(_)=>return HttpResponse::BadRequest().into()};
     graphs.insert(*currentID, loadedGraph);
     *currentID += 1;
     HttpResponse::Ok().content_type("text").body((*currentID-1).to_string())
 }
 
 #[post("/retrieveGraph")]
-async fn retrieve_graph(data: web::Data<AppState>, body:web::Bytes)->impl Responder{
+async fn retrieve_graph(request: HttpRequest,data: web::Data<AppState>, body:web::Bytes)->impl Responder{
     let graphs = data.graphs.lock().unwrap();
-    if(!graphs.contains_key(&(String::from_utf8(body.to_vec()).unwrap()).parse().unwrap())){
-        return HttpResponse::Ok().content_type("application/json").body("{\"isValid\":\"no\"}");
+    let graph = match graphs.get(match &(match String::from_utf8(body.to_vec()){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()}).parse(){Ok(val)=>val, Err(_)=> return HttpResponse::BadRequest().into()}){Some(val)=>val, None=>return HttpResponse::BadRequest().into()};
+    if !corroborate_claim(graph, &request).await{
+        return HttpResponse::Unauthorized().into()
     }
-    HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&graphs.get(&(String::from_utf8(body.to_vec()).unwrap()).parse().unwrap()).unwrap().get_command_history()).unwrap())
+    HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&graph.get_command_history()).unwrap())
 }
 
 #[derive(Deserialize)]
@@ -231,18 +246,51 @@ struct SaveInfo{
 }
 
 #[post("/saveGraph")]
-async fn save_graph(data: web::Data<AppState>, saveInfo:Json<SaveInfo>)->impl Responder{
+async fn save_graph(request: HttpRequest,data: web::Data<AppState>, saveInfo:Json<SaveInfo>)->impl Responder{
     let graphs = data.graphs.lock().unwrap();
-    let mut output = File::create(RESOURCE_PATH.clone()+r"\graphs\"+&saveInfo.fileName).unwrap();
-    write!(output,"{}",serde_json::to_string(&graphs.get(&saveInfo.graphID).unwrap().get_command_history()).unwrap()).unwrap();
+    let graph = graphs.get(&saveInfo.graphID).unwrap();
+    if !corroborate_claim(graph, &request).await{
+        return HttpResponse::Unauthorized();
+    }
+    let username = match get_username_from_token(match request.cookie("session"){Some(val)=>val, None=>return HttpResponse::Unauthorized().into()}.value().to_owned()){Some(val)=>val,None=>return HttpResponse::BadRequest().into()};
+
+    let results = sqlx::query("SELECT graph FROM graphs WHERE username=$1 AND graphName=$2")
+        .bind(username.clone())
+        .bind(saveInfo.fileName.clone())
+        .fetch_all(&data.db)
+        .await
+        .unwrap();
+    if !results.is_empty(){
+        let _result = sqlx::query("UPDATE graphs SET graph=$3 WHERE username=$1 AND graphName=$2")
+            .bind(username)
+            .bind(saveInfo.fileName.clone())
+            .bind(serde_json::to_string(graph.get_command_history()).unwrap())
+            .execute(&data.db)
+            .await
+            .unwrap();
+    }else{
+        let _result = sqlx::query("INSERT INTO graphs (username,graphName,graph) VALUES ($1,$2,$3)")
+            .bind(username)
+            .bind(saveInfo.fileName.clone())
+            .bind(serde_json::to_string(graph.get_command_history()).unwrap())
+            .execute(&data.db)
+            .await
+            .unwrap();
+    }
+
+
+
     HttpResponse::Ok()
 }
 
 #[post("/createGraph")]
-async fn create_graph(data: web::Data<AppState>)->impl Responder{
+async fn create_graph(request: HttpRequest,data: web::Data<AppState>)->impl Responder{
     let mut graphs = data.graphs.lock().unwrap();
     let mut currentID = data.currentID.lock().unwrap();
-    let newGraph = Graph::new("".to_string());
+    let newGraph = Graph::new(match get_username_from_token(match request.cookie("session"){Some(val)=>val,None=> return HttpResponse::Unauthorized().into()}.value().to_owned()){
+        Some(val) => val,
+        None => return HttpResponse::Unauthorized().into()
+    });
     graphs.insert(*currentID, newGraph);
     *currentID += 1;
     HttpResponse::Ok().content_type("text").body((*currentID-1).to_string())
@@ -365,10 +413,13 @@ async fn graph_page_javascript_graph()-> impl Responder {
 
 
 #[post("/process")]
-async fn process_graph(data: web::Data<AppState>, body:web::Bytes)-> impl Responder {
+async fn process_graph(request: HttpRequest, data: web::Data<AppState>, body:web::Bytes)-> impl Responder {
     let mut graphs = data.graphs.lock().unwrap();
-    let outputImage = graphs.get_mut(&(String::from_utf8(body.to_vec()).unwrap()).parse().unwrap()).unwrap().process();
-    //outputImage.save(RESOURCE_PATH.clone()+r"images\output_0.png").unwrap();
+    let graph = match graphs.get_mut(&match(match String::from_utf8(body.to_vec()){Ok(val)=>val, Err(_)=>return HttpResponse::BadRequest().into()}).parse(){Ok(val)=>val, Err(_)=>return HttpResponse::BadRequest().into()}){Some(val)=>val, None=>return HttpResponse::BadRequest().into()};
+    if !corroborate_claim(graph, &request).await{
+        return HttpResponse::Unauthorized().into();
+    }
+    let outputImage = graph.process();
     let mut bytes: Vec<u8> = Vec::new();
     outputImage.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png).unwrap();
     HttpResponse::Ok().content_type("image/png").body(bytes)
@@ -383,9 +434,13 @@ struct commandGraphData{
 }
 
 #[post("/command")]
-async fn command_graph(data: web::Data<AppState>, commands: Json<commandGraphData>)-> impl Responder{
+async fn command_graph(request: HttpRequest, data: web::Data<AppState>, commands: Json<commandGraphData>)-> impl Responder{
     let mut graphs = data.graphs.lock().unwrap();
-    HttpResponse::Ok().content_type("text").body(match graphs.get_mut(&commands.graphID).unwrap().execute_commands(commands.commands.clone()).err(){
+    let graph = match graphs.get_mut(&commands.graphID){Some(val)=>val, None=> return HttpResponse::BadRequest().into()};
+    if !corroborate_claim(graph, &request).await{
+        return HttpResponse::Unauthorized().into();
+    }
+    HttpResponse::Ok().content_type("text").body(match graph.execute_commands(commands.commands.clone()).err(){
         Some(error) => match error{
             graph::GraphError::Cycle=>"cycle",
             graph::GraphError::EdgeNotFound => "edge not found",
@@ -406,7 +461,6 @@ async fn retrieve_node_templates()->impl Responder{
     descriptors.push(graph::node::finalNode::FinalNode::get_node_descriptor());
     descriptors.push(graph::node::imageInputNode::ImageInputNode::get_node_descriptor());
     descriptors.push(graph::node::colorToImageNode::ColorToImageNode::get_node_descriptor());
-    //println!("{}",serde_json::to_string(&descriptors).unwrap());
     HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&descriptors).unwrap())
 }
 
@@ -442,7 +496,10 @@ async fn main() -> std::io::Result<()> {
     let result = sqlx::query("CREATE TABLE IF NOT EXISTS users (username VARCHAR(64) NOT NULL, password_hash VARCHAR(255) NOT NULL);").execute(&db).await.unwrap();
     println!("Create user table result: {:?}", result);
     
-    let result = sqlx::query("CREATE TABLE IF NOT EXISTS graphIDs (id NOT NULL, username VARCHAR(64) NOT NULL);").execute(&db).await.unwrap();
+    let result = sqlx::query("CREATE TABLE IF NOT EXISTS graphIDs (id INTEGER NOT NULL, username VARCHAR(64) NOT NULL);").execute(&db).await.unwrap();
+    println!("Create user table result: {:?}", result);
+
+    let result = sqlx::query("CREATE TABLE IF NOT EXISTS graphs (username VARCHAR(64) NOT NULL, graphName VARCHAR(128), graph TEXT NOT NULL);").execute(&db).await.unwrap();
     println!("Create user table result: {:?}", result);
 
     

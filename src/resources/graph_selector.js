@@ -3,7 +3,7 @@ console.log(getCookie("session"));
 
 let graphFiles = null;
 async function onsubmitCreateForm(){
-    let graphFile = document.getElementById("graphName").value + ".graph"
+    let graphFile = document.getElementById("graphName").value
     const options = {
         method: "POST",
         headers: {
@@ -12,6 +12,7 @@ async function onsubmitCreateForm(){
         body: graphFile
     };
     let response = await fetch("/createGraph", options);
+    if(response.status==401){window.location.href = domainName+"login";}
     let graphID = Number(await response.text());
     
     const options2 = {
@@ -21,7 +22,8 @@ async function onsubmitCreateForm(){
         },
         body: JSON.stringify({fileName:graphFile,graphID:graphID})
     };
-    await fetch("/saveGraph", options2);
+    let response2 = await fetch("/saveGraph", options2);
+    if(response2.status==401){window.location.href = domainName+"login";}
     setCookie("graphFile",graphFile,2);
     setCookie("graphID",graphID,2);
     
@@ -41,8 +43,8 @@ async function createNew(){
 function onsubmitLoadForm(){
     let mainBody = async function(){
         for(const graphFile of graphFiles){
-            let fileName = graphFile.split(".")[0];
-            if(document.getElementById(fileName).checked){
+            console.log(graphFile);
+            if(document.getElementById(graphFile).checked){
                 const options = {
                     method: "POST",
                     headers: {
@@ -51,6 +53,7 @@ function onsubmitLoadForm(){
                     body: graphFile
                 };
                 let response = await fetch("/loadGraph", options);
+                if(response.status==401){window.location.href = domainName+"login";}
                 let graphID = Number(await response.text());
                 setCookie("graphFile",graphFile,2);
                 setCookie("graphID",graphID,2);
@@ -67,14 +70,13 @@ async function mainMenu(){
         method: "GET"
     };
     let response = await fetch("/retrieveGraphFileList", options);
+    //credentials are no longer valid
+    if(response.status==401){window.location.href = domainName+"login";}
     graphFiles = await response.json();
-    console.log(graphFiles);
     let contents= "<form id=\"loadForm\" name=\"loadForm\">";
     for(const graphFile of graphFiles){
-        let fileName = graphFile.split(".")[0];
-
-        contents += "<input type=\"radio\" name=\"fileName\" id=\""+fileName+"\"></input>";
-        contents += "<label for=\""+fileName+"\">"+fileName+"</label><br>"
+        contents += "<input type=\"radio\" name=\"fileName\" id=\""+graphFile+"\"></input>";
+        contents += "<label for=\""+graphFile+"\">"+graphFile+"</label><br>"
     }
     contents += "<input type=\"submit\" value=\"load\"></input>  </form>";
     contents += "</form>";

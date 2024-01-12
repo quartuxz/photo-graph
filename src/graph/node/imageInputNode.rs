@@ -2,20 +2,25 @@ use super::*;
 use image::DynamicImage;
 
 pub struct ImageInputNode{
-    location : String,
+    filename : String,
     buffered: bool,
-    buffer : RgbaImage
+    buffer : RgbaImage,
+    username: String
 }
 
 impl ImageInputNode{
     fn retrieve_image(&mut self){
-        self.buffer = match image::open(self.location.clone()).unwrap(){
+        let mut finalFile = self.filename.clone();
+        if finalFile != "dummy.png" {
+            finalFile = self.username.clone() + "_" + finalFile.as_str();
+        }
+        self.buffer = match image::open(crate::RESOURCE_PATH.clone()+r"\images\"+ finalFile.as_str()).unwrap(){
             DynamicImage::ImageRgba8(im) => im,
             _ => panic!("unsupported Image")
         };
     }
-    pub fn new()->Self{
-        ImageInputNode { location: "".to_string(), buffered: false, buffer: RgbaImage::default() }
+    pub fn new(username:String)->Self{
+        ImageInputNode { filename: "".to_string(), buffered: false, buffer: RgbaImage::default(), username }
     }
 
 }
@@ -23,7 +28,7 @@ impl ImageInputNode{
 impl NodeStatic for ImageInputNode{
 
     fn get_inputs_static()->Vec<NodeInputOptions>{
-        vec![NodeInputOptions{IOType:NodeIOType::StringType(crate::RESOURCE_PATH.clone() + r"images\" + "dummy2.png"), canAlterDefault:true,hasConnection:false, name:"path".to_string(), presetValues:None,subtype:Some(NodeIOSubtypes::FilePath)}]
+        vec![NodeInputOptions{IOType:NodeIOType::StringType("dummy.png".to_string()), canAlterDefault:true,hasConnection:false, name:"path".to_string(), presetValues:None,subtype:Some(NodeIOSubtypes::FilePath)}]
     }
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{
@@ -41,7 +46,7 @@ impl Node for ImageInputNode{
     fn clear_buffers(&mut self) {
         self.buffered = false;
         self.buffer = RgbaImage::default();
-        self.location = String::default();
+        self.filename = String::default();
     }
 
 
@@ -49,7 +54,7 @@ impl Node for ImageInputNode{
     fn set(&mut self, index: u16, value: NodeIOType) -> NodeResult<()> {
         self.generate_input_errors(&index, &value)?;
         if let NodeIOType::StringType(location) = value{
-            self.location = location;
+            self.filename = location;
         }
 
         NodeResult::Ok(())

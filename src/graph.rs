@@ -315,7 +315,7 @@ impl Graph{
                 "addEdge" => self.add_edge(Edge {outputNode:cmd.args[0].parse().unwrap(),outputIndex:cmd.args[1].parse().unwrap(),inputNode:cmd.args[2].parse().unwrap(),inputIndex:cmd.args[3].parse().unwrap()})?,
                 "addNode" => 
                 if cmd.args[0] == node::imageInputNode::ImageInputNode::get_node_name_static() {
-                    self.add_node(Box::new(node::imageInputNode::ImageInputNode::new()));
+                    self.add_node(Box::new(node::imageInputNode::ImageInputNode::new(self.user.clone())));
                 }else if cmd.args[0] == node::colorToImageNode::ColorToImageNode::get_node_name_static(){
                     self.add_node(Box::new(node::colorToImageNode::ColorToImageNode::new()));
                 }else if cmd.args[0] == node::mathNode::MathNode::get_node_name_static(){
@@ -369,13 +369,13 @@ mod tests{
     #[test]
     fn add_node_test(){
         let mut graph = super::Graph::new("".to_string());
-        graph.add_node(Box::new(ImageInputNode::new()));
+        graph.add_node(Box::new(ImageInputNode::new(graph.get_user())));
         assert_eq!(graph.edges[1].1, super::Edge{inputIndex:0,outputIndex:0,inputNode:2,outputNode:3});
     }
     #[test]
     fn simple_add_edge_test(){
         let mut graph = super::Graph::new("".to_string());
-        graph.add_node(Box::new(ImageInputNode::new()));
+        graph.add_node(Box::new(ImageInputNode::new(graph.get_user())));
         graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:0,outputNode:2}).unwrap();
         assert_eq!(graph.edges[1].1, super::Edge{inputIndex:0,outputIndex:0,inputNode:0,outputNode:2});
         assert_eq!(graph.edges[1].0, 1);
@@ -384,7 +384,7 @@ mod tests{
     #[test]
     fn remove_edge_test(){
         let mut graph = super::Graph::new("".to_string());
-        graph.add_node(Box::new(ImageInputNode::new()));
+        graph.add_node(Box::new(ImageInputNode::new(graph.get_user())));
         graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:0,outputNode:2}).unwrap();
         graph.remove_edge_and_replace_with_default(&super::Edge{inputIndex:0, outputIndex:0, inputNode:0,outputNode:2}, true).unwrap();
         assert_eq!(graph.edges[1].1, super::Edge{inputIndex:0,outputIndex:0,inputNode:0,outputNode:1});
@@ -450,7 +450,7 @@ mod tests{
 
 
         //11
-        graph.add_node(Box::new(ImageInputNode::new()));
+        graph.add_node(Box::new(ImageInputNode::new(graph.get_user())));
         graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:8,outputNode:11}).unwrap();
 
 
