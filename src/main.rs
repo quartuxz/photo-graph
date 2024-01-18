@@ -1,4 +1,6 @@
 mod graph;
+mod util;
+mod image_utils;
 #[macro_use]
 extern crate lazy_static;
 
@@ -10,13 +12,11 @@ use std::{fs, collections::HashMap,io::Write};
 use std::sync::Mutex;
 
 
-lazy_static!{
-    static ref RESOURCE_PATH : String = r"C:\Users\Administrator\Desktop\rust\photo-graph\src\resources\".to_string();
-    static ref SECRET : String = fs::read_to_string(r"C:\Users\Administrator\Desktop\secret.txt").unwrap();
-}
+
 
 use std::time;
 
+use actix_web::HttpResponseBuilder;
 use actix_web::body::MessageBody;
 use argon2::{
     password_hash::{
@@ -26,8 +26,12 @@ use argon2::{
     Argon2
 };
 
-use actix_web::web::Json;
+use actix_multipart::Multipart;
+use actix_web::web::{Json, Redirect};
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, HttpRequest, http::{header::{CacheControl, CacheDirective}}};
+
+use cookie::Cookie;
+use tokio_stream::StreamExt;
 
 use chrono::{Utc, Duration};
 use graph::Graph;
@@ -67,11 +71,16 @@ struct AppState{
 
 }
 
+fn sanitize(dirty: &str)->String{
+    let mut clean = dirty.to_owned();   
+    clean
+}
 
 
 async fn authenticate(db:&sqlx::Pool<Sqlite>,userCred:&UserCredentials)->bool{
+    let username = sanitize(&userCred.username);
     let user_results = sqlx::query_as::<_, User>("SELECT username, password_hash FROM users WHERE username=$1")
-        .bind(userCred.username.clone())
+        .bind(username)
         .fetch_all(db)
         .await
         .unwrap();
@@ -94,7 +103,7 @@ fn get_username_from_token(token:String)->Option<String>{
     validator.validate_exp = true;
     let token_data = match decode::<LoginClaim>(
         &token,
-        &DecodingKey::from_secret(SECRET.as_bytes()),
+        &DecodingKey::from_secret(util::SECRET.as_bytes()),
         &validator,
     ) {
         Ok(c) => c,
@@ -118,6 +127,9 @@ async fn corroborate_claim(grph : &graph::Graph, request: &HttpRequest)->bool{
 
 #[post("/createAccount")]
 async fn create_account(data: web::Data<AppState>, userCred:Json<UserCredentials>)->impl Responder{
+    if util::sanitize(&userCred.username,true).len()< userCred.username.len(){
+        return HttpResponse::BadRequest().content_type("text").body("invalid username");
+    }
     let user_results = sqlx::query_as::<_, User>("SELECT username, password_hash FROM users WHERE username=$1")
         .bind(userCred.username.clone())
         .fetch_all(&data.db)
@@ -142,6 +154,8 @@ async fn create_account(data: web::Data<AppState>, userCred:Json<UserCredentials
         .await
         .unwrap();
 
+    let _ = fs::create_dir_all(util::RESOURCE_PATH.clone()+r"\images\"+r"\"+&userCred.username);
+
     HttpResponse::Ok().content_type("text").body("ok")
 }
 
@@ -156,6 +170,10 @@ struct LoginClaim {
 
 #[post("/login")]
 async fn login(data: web::Data<AppState>, userCredentials:Json<UserCredentials>)->impl Responder{
+    if !authenticate(&data.db, &userCredentials).await{
+        return HttpResponse::Unauthorized().into();
+    }
+
     let my_iat = Utc::now().timestamp();
     let my_exp = Utc::now()
         .checked_add_signed(Duration::days(1))
@@ -171,17 +189,14 @@ async fn login(data: web::Data<AppState>, userCredentials:Json<UserCredentials>)
     let token = match encode(
         &Header::default(),
         &loginClaim,
-        &EncodingKey::from_secret(SECRET.as_bytes()),
+        &EncodingKey::from_secret(util::SECRET.as_bytes()),
     ) {
         Ok(t) => t,
         Err(_) => panic!(),
     };
 
-    if !authenticate(&data.db, &userCredentials).await{
-        return HttpResponse::Unauthorized().content_type("text").body("fail");
-    }
-
-    HttpResponse::Ok().content_type("text").body(token)
+    let session : Cookie = Cookie::build("session", token).http_only(true).finish();
+    HttpResponse::Ok().cookie(session).finish()
 }
 
 
@@ -208,7 +223,8 @@ async fn load_graph(request: HttpRequest,data: web::Data<AppState>, body:web::By
         Some(value) => value,
         None => return HttpResponse::Unauthorized().into()
     };
-    let graphName = match String::from_utf8(body.to_vec()){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()};
+    let mut graphName = match String::from_utf8(body.to_vec()){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()};
+    graphName = sanitize(&graphName);
     let result = sqlx::query("SELECT graph FROM graphs WHERE username=$1 AND graphName=$2")
         .bind(username.clone())
         .bind(graphName.clone())
@@ -223,7 +239,7 @@ async fn load_graph(request: HttpRequest,data: web::Data<AppState>, body:web::By
     }
     //username is guaranteed to be valid because it was found in the database
     let mut loadedGraph = Graph::new(username);
-    match loadedGraph.execute_commands(match serde_json::from_str(&contents){Ok(val)=>val, Err(_)=>return  HttpResponse::InternalServerError().into()}){Ok(_)=>(),Err(_)=>return HttpResponse::BadRequest().into()};
+    match loadedGraph.execute_commands(match serde_json::from_str(&contents){Ok(val)=>val, Err(_)=>return HttpResponse::InternalServerError().into()}){Ok(_)=>(),Err(_)=>return HttpResponse::BadRequest().into()};
     graphs.insert(*currentID, loadedGraph);
     *currentID += 1;
     HttpResponse::Ok().content_type("text").body((*currentID-1).to_string())
@@ -231,8 +247,10 @@ async fn load_graph(request: HttpRequest,data: web::Data<AppState>, body:web::By
 
 #[post("/retrieveGraph")]
 async fn retrieve_graph(request: HttpRequest,data: web::Data<AppState>, body:web::Bytes)->impl Responder{
+    
     let graphs = data.graphs.lock().unwrap();
-    let graph = match graphs.get(match &(match String::from_utf8(body.to_vec()){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()}).parse(){Ok(val)=>val, Err(_)=> return HttpResponse::BadRequest().into()}){Some(val)=>val, None=>return HttpResponse::BadRequest().into()};
+    
+    let graph = match graphs.get(match &(match String::from_utf8(body.to_vec()){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()}).parse(){Ok(val)=>val, Err(_)=> return HttpResponse::BadRequest().into()}){Some(val)=>val, None=>return HttpResponse::Unauthorized().into()};
     if !corroborate_claim(graph, &request).await{
         return HttpResponse::Unauthorized().into()
     }
@@ -248,7 +266,7 @@ struct SaveInfo{
 #[post("/saveGraph")]
 async fn save_graph(request: HttpRequest,data: web::Data<AppState>, saveInfo:Json<SaveInfo>)->impl Responder{
     let graphs = data.graphs.lock().unwrap();
-    let graph = graphs.get(&saveInfo.graphID).unwrap();
+    let graph = match graphs.get(&saveInfo.graphID){Some(val)=>val,None=>return HttpResponse::BadRequest().into()};
     if !corroborate_claim(graph, &request).await{
         return HttpResponse::Unauthorized();
     }
@@ -256,14 +274,14 @@ async fn save_graph(request: HttpRequest,data: web::Data<AppState>, saveInfo:Jso
 
     let results = sqlx::query("SELECT graph FROM graphs WHERE username=$1 AND graphName=$2")
         .bind(username.clone())
-        .bind(saveInfo.fileName.clone())
+        .bind(sanitize(&saveInfo.fileName))
         .fetch_all(&data.db)
         .await
         .unwrap();
     if !results.is_empty(){
         let _result = sqlx::query("UPDATE graphs SET graph=$3 WHERE username=$1 AND graphName=$2")
             .bind(username)
-            .bind(saveInfo.fileName.clone())
+            .bind(sanitize(&saveInfo.fileName))
             .bind(serde_json::to_string(graph.get_command_history()).unwrap())
             .execute(&data.db)
             .await
@@ -271,7 +289,7 @@ async fn save_graph(request: HttpRequest,data: web::Data<AppState>, saveInfo:Jso
     }else{
         let _result = sqlx::query("INSERT INTO graphs (username,graphName,graph) VALUES ($1,$2,$3)")
             .bind(username)
-            .bind(saveInfo.fileName.clone())
+            .bind(sanitize(&saveInfo.fileName))
             .bind(serde_json::to_string(graph.get_command_history()).unwrap())
             .execute(&data.db)
             .await
@@ -298,55 +316,55 @@ async fn create_graph(request: HttpRequest,data: web::Data<AppState>)->impl Resp
 
 #[get("/")]
 async fn graph_selector_html()-> impl Responder{
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"graph_selector.html").unwrap();
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"graph_selector.html").unwrap();
 
     HttpResponse::Ok().content_type("text/html").body(contents)
 }
 
 #[get("/utils.js")]
 async fn utils_javascript()->impl Responder{
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"utils.js").unwrap();
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"utils.js").unwrap();
     HttpResponse::Ok().content_type("text/javascript").body(contents)
 }
 
 #[get("/graph_selector.js")]
 async fn graph_selector_javascript()->impl Responder{
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"graph_selector.js").unwrap();
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"graph_selector.js").unwrap();
 
     HttpResponse::Ok().content_type("text/javascript").body(contents)
 }
 
 #[get("/create_account")]
 async fn create_account_html()->impl Responder{
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"create_account.html").unwrap();
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"create_account.html").unwrap();
 
     HttpResponse::Ok().content_type("text/html").body(contents)
 }
 
 #[get("/create_account.js")]
 async fn create_account_javascript()->impl Responder{
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"create_account.js").unwrap();
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"create_account.js").unwrap();
 
     HttpResponse::Ok().content_type("text/html").body(contents)
 }
 
 #[get("/login")]
 async fn login_html()->impl Responder{
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"login.html").unwrap();
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"login.html").unwrap();
 
     HttpResponse::Ok().content_type("text/html").body(contents)
 }
 
 #[get("/login.js")]
 async fn login_javascript()->impl Responder{
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"login.js").unwrap();
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"login.js").unwrap();
 
     HttpResponse::Ok().content_type("text/javascript").body(contents)
 }
 
 #[get("/graph")]
 async fn graph_page_html() -> impl Responder {
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"main.html").unwrap();
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"main.html").unwrap();
 
     HttpResponse::Ok().content_type("text/html").body(contents)
     //HttpResponse::Ok().body(r#"<script>
@@ -378,35 +396,35 @@ async fn graph_page_html() -> impl Responder {
 
 #[get("/main.js")]
 async fn graph_page_javascript_main()-> impl Responder {
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"main.js").unwrap();
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"main.js").unwrap();
 
     HttpResponse::Ok().content_type("text/javascript").body(contents)
 }
 
 #[get("/style.css")]
 async fn style()-> impl Responder {
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"style.css").unwrap();
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"style.css").unwrap();
 
     HttpResponse::Ok().content_type("text/css").body(contents)
 }
 
 #[get("/UI.js")]
 async fn graph_page_javascript_UI()-> impl Responder {
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"UI.js").unwrap();
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"UI.js").unwrap();
 
     HttpResponse::Ok().content_type("text/javascript").body(contents)
 }
 
 #[get("/matrix.js")]
 async fn graph_page_javascript_matrix()-> impl Responder {
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"matrix.js").unwrap();
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"matrix.js").unwrap();
 
     HttpResponse::Ok().content_type("text/javascript").body(contents)
 }
 
 #[get("/graph.js")]
 async fn graph_page_javascript_graph()-> impl Responder {
-    let contents = fs::read_to_string(RESOURCE_PATH.clone()+"graph.js").unwrap();
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"graph.js").unwrap();
 
     HttpResponse::Ok().content_type("text/javascript").body(contents)
 }
@@ -461,7 +479,67 @@ async fn retrieve_node_templates()->impl Responder{
     descriptors.push(graph::node::finalNode::FinalNode::get_node_descriptor());
     descriptors.push(graph::node::imageInputNode::ImageInputNode::get_node_descriptor());
     descriptors.push(graph::node::colorToImageNode::ColorToImageNode::get_node_descriptor());
+    descriptors.push(graph::node::composeNode::ComposeNode::get_node_descriptor());
+    descriptors.push(graph::node::blendNode::BlendNode::get_node_descriptor());
     HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&descriptors).unwrap())
+}
+
+#[derive(Deserialize)]
+struct UploadData{
+    fileName:String,
+    fileType:String,
+    file:String
+}
+
+#[post("/upload")]
+async fn upload_image(request: HttpRequest,mut payload: Multipart)->impl Responder{
+    let mut file_data = Vec::<u8>::new();
+    let mut fileName: Option<String>= None;
+    let username = match get_username_from_token(match request.cookie("session"){Some(val)=>val,None=>return Redirect::to("/login").see_other()}.value().to_owned()){Some(val)=>val,None=>return Redirect::to("/login").see_other()};
+    while let Some(mut field) = payload.try_next().await.unwrap() {
+        let content_disposition = field.content_disposition();
+        let field_name = content_disposition.get_name().unwrap();
+        match field_name {
+            "file" => {
+                while let Some(chunk) = match field.try_next().await{Ok(val)=>val,Err(_)=>return Redirect::to("/upload_image?bad_image").see_other()} {
+                    file_data.extend_from_slice(&chunk);
+                }
+            }
+            "fileName" => {
+                let bytes = match field.try_next().await{
+                    Ok(val)=>val,
+                    Err(_)=>return Redirect::to("/upload_image?bad_name").see_other()
+                };
+                fileName = String::from_utf8(bytes.unwrap().to_vec()).ok();
+            }
+            _ => {}
+        }
+    }
+    let cleanFileName = util::sanitize(&match fileName{Some(val)=>val,None=>return Redirect::to("/upload_image?bad_name").see_other()},true);
+    if(cleanFileName.is_empty()){
+        return Redirect::to("/upload_image?bad_name").see_other();
+    }
+    let image = match image::load_from_memory(&file_data){Ok(val)=>val, Err(_)=>return Redirect::to("/upload_image?bad_image").see_other()};
+    match image.save_with_format(util::RESOURCE_PATH.clone()+r"\images\"+r"\"+&util::sanitize(&username,true)+r"\"+&cleanFileName+".png", image::ImageFormat::Png){
+        Ok(_)=>(),
+        Err(_)=>return Redirect::to("/upload_image?bad_image").see_other()
+    };
+
+    Redirect::to("/graph").see_other()
+}
+
+#[get("/upload_image")]
+async fn upload_image_html()->impl Responder{
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"upload_image.html").unwrap();
+
+    HttpResponse::Ok().content_type("text/html").body(contents)
+}
+
+#[get("/upload_image.js")]
+async fn upload_image_javascript()->impl Responder{
+    let contents = fs::read_to_string(util::RESOURCE_PATH.clone()+"upload_image.js").unwrap();
+
+    HttpResponse::Ok().content_type("text/html").body(contents)
 }
 
 #[derive(Deserialize)]
@@ -475,7 +553,7 @@ async fn images(_req: HttpRequest, info: web::Path<Info>) -> impl Responder {
     HttpResponse::Ok()
     .insert_header(CacheControl(vec![CacheDirective::NoCache, CacheDirective::NoStore, CacheDirective::MustRevalidate]))
     .content_type("image/png")
-    .body(web::block(move || std::fs::read(RESOURCE_PATH.clone()+r"images\" + &name)).await.unwrap().expect(&info.name))
+    .body(web::block(move || std::fs::read(util::RESOURCE_PATH.clone()+r"images\" + &name)).await.unwrap().expect(&info.name))
 }
 
 #[actix_web::main]
@@ -531,7 +609,7 @@ async fn main() -> std::io::Result<()> {
             .service(process_graph)
             .service(graph_page_html)
             //.service(Files::new("/images", RESOURCE_PATH.clone()+"/images"))
-            .service(web::resource("/images/{name}").route(web::get().to(images)))
+            //.service(web::resource("/images/{name}").route(web::get().to(images)))
             .service(graph_page_javascript_main)
             .service(graph_page_javascript_matrix)
             .service(graph_page_javascript_graph)
@@ -539,6 +617,9 @@ async fn main() -> std::io::Result<()> {
             .service(style)
             .service(retrieve_node_templates)
             .service(command_graph)
+            .service(upload_image_html)
+            .service(upload_image_javascript)
+            .service(upload_image)
     })
     .bind(("127.0.0.1", 8080))?
     .run()

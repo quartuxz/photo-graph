@@ -8,6 +8,8 @@ pub mod colorLiteralNode;
 pub mod rotationNode;
 pub mod mathNode;
 pub mod colorToImageNode;
+pub mod composeNode;
+pub mod blendNode;
 
 use std::{vec, result, fmt};
 use serde::{Serialize, Serializer, ser::SerializeStruct};
@@ -134,10 +136,12 @@ pub enum NodeError{
     InvalidInputIndex(String, u16),
     #[error("The node '{0}' does not implement output at position '{1}'.")]
     InvalidOutputIndex(String, u16),
-    #[error("The node '{0} does not implement ouput.'")]
+    #[error("The node '{0}' does not implement ouput.")]
     NoOutput(String),
-    #[error("The node '{0} does not implement input.'")]
-    NoInput(String)
+    #[error("The node '{0}' does not implement input.")]
+    NoInput(String),
+    #[error("the node '{0}' had an IO error.")]
+    IOError(String)
 }
 
 pub type NodeResult<T> = result::Result<T, NodeError>;
@@ -175,7 +179,7 @@ pub trait NodeDefaults: Send+Sync{
     fn get_node_name(&self)->String;
 }
 
-//all fields in implementors that are set with the set_x methods are expected to be repopulated after every processing run.
+//all fields in implementors that are set with the set method are expected to be repopulated after every processing run.
 pub trait Node: Send + Sync + NodeDefaults + NodeStatic{
     
     fn generate_output_errors(&self, index:&u16)->NodeResult<()>{

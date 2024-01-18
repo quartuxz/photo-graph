@@ -103,15 +103,18 @@ impl Graph{
             layer+=1;
         }
 
-        for (_key, value) in &mut self.nodes{
-            value.clear_buffers();
-        }
+
         
         if let node::NodeIOType::BitmapType(bitmap) =self.nodes.get_mut(&0).unwrap().get(0).unwrap(){
+            for (_key, value) in &mut self.nodes{
+                value.clear_buffers();
+            }
             bitmap
         }else{
             panic!();
         }
+
+
     }
 
 
@@ -320,6 +323,10 @@ impl Graph{
                     self.add_node(Box::new(node::colorToImageNode::ColorToImageNode::new()));
                 }else if cmd.args[0] == node::mathNode::MathNode::get_node_name_static(){
                     self.add_node(Box::new(node::mathNode::MathNode::new()));
+                }else if cmd.args[0] == node::composeNode::ComposeNode::get_node_name_static(){
+                    self.add_node(Box::new(node::composeNode::ComposeNode::new()));
+                }else if cmd.args[0] == node::blendNode::BlendNode::get_node_name_static(){
+                    self.add_node(Box::new(node::blendNode::BlendNode::new()));
                 }
                 "removeNode" => self.remove_node(cmd.args[0].parse().unwrap(),true)?,
                 "moveNode" => (),

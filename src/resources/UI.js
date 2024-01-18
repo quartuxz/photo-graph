@@ -44,7 +44,6 @@ class ContextMenu{
       this.selected.selected = true;
       document.getElementById("contextInner").innerHTML = "";
       let contents = "Edit \""+ parameter.nodeName +"\": <br> <form id=\"manipulateForm\" >";
-      console.log(parameter.template);
       let isEditable = false;
       for(let i = 0; i < parameter.template.inputNodes.length;i++){
 
@@ -54,6 +53,9 @@ class ContextMenu{
           isEditable = true;
 
           let value = parameter.defaultValues[i];
+          if(inode.IOType == "bitmap"){
+            continue;
+          }
           if(this.ui.graph.getLineByInput(parameter.id,i)!= null){
             contents += inode.name+"<br> connected<br>";
             this.nodeProperties.get(inode.name).hasConnection = true;
@@ -65,17 +67,17 @@ class ContextMenu{
             contents += "<input type=\"text\" id=\"alpha\" name=\"alpha\" value=\""+value[3]+"\"></input> <br>";
           }else if(inode.presetValues != null){
             contents += inode.name+":<br>";
+            contents+= "<select id=\""+inode.name+"\">";
             for(let o = 0; o < inode.presetValues.length;o++){
-              let checked = "";
+              let selected = "";
               if(o == value){
-                console.log(o);
-                checked = "checked";
+                selected = "selected=\"selected\"";
               }
 
-              contents += "<input type=\"radio\" id=\""+inode.presetValues[o]+"\" name=\"preset\" value\""+o+"\" "+checked+"></input>";
-              contents += "<label for=\""+inode.presetValues[o]+"\">"+inode.presetValues[o]+"</label><br>";
+              contents += "<option value=\""+o+"\" "+selected+">"+inode.presetValues[o]+"</option>"
 
             }
+            contents += "</select><br>";
           }else{
             contents += "<label for=\""+ inode.name +"\">"+inode.name+"</label> <br>";
             contents += "<input type=\"text\" id=\""+inode.name+"\" name=\""+inode.name+"\" value=\""+value+"\"></input> <br>";
@@ -88,7 +90,7 @@ class ContextMenu{
       }
       contents += "<input type=\"submit\" value=\"Change\"></input>  </form>";
       document.getElementById("contextInner").innerHTML = contents;
-      document.getElementById("manipulateForm").onsubmit = this.onSubmitManipulate.bind(this);
+      document.getElementById("manipulateForm").onsubmit = () => {this.onSubmitManipulate(); return false;};
 
 
     }else if(type=="create"){
@@ -109,27 +111,23 @@ class ContextMenu{
 
   onSubmitManipulate(){
     for(const inode of this.selected.template.inputNodes){
-      if(this.nodeProperties.get(inode.name).hasConnection){
-        //nothing to do
+      if(this.nodeProperties.get(inode.name).hasConnection || inode.IOType == "bitmap"){
+        continue;
       }
       else if(inode.IOType == "color"){
         let color = hexadecimalToRGB(document.getElementById(inode.name).value);
         color.push(parseInt(document.getElementById("alpha").value));
         this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,color);
       }else if(inode.presetValues != null){
-        for(let i = 0; i < inode.presetValues.length; i++){
-          if(document.getElementById(inode.presetValues[i]).checked){
-            this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[i]);
-          }
-
-        }
+        let val = document.getElementById(inode.name).value;
+        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[Number(val)]);
+        
       }else{
         this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[document.getElementById(inode.name).value]);
       }
 
     }
     this.ui.process();
-    return false;
   }
 
   onSubmitCreate(){
@@ -248,6 +246,14 @@ class UI{
           this.context.fillRect(i*30,o*30,30,30);
         }
       }
+    }
+
+    resetView(){
+      this.context.setTransform(1,0,0,1,0,0);
+      this.graph.transformation = Mat3.identity();
+      this.origin = Vec2(0,0);
+      this.scale = 1;
+      this.draw();
     }
   
     draw(){

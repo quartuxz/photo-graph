@@ -30,7 +30,7 @@ impl NodeStatic for FinalNode{
 impl Node for FinalNode{
 
     fn clear_buffers(&mut self) {
-        
+        *self=FinalNode::new();
     }
 
     fn get(&mut self, index: u16) -> NodeResult<NodeIOType> {

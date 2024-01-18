@@ -37,11 +37,7 @@ impl Node for ColorToImageNode{
 
 
     fn clear_buffers(&mut self) {
-        self.buffered = false;
-        self.buffer = RgbaImage::default();
-        self.color = Rgba([100,100,100,255]);
-        self.width = 500;
-        self.height = 500;
+        *self = ColorToImageNode::new();
     }
 
 

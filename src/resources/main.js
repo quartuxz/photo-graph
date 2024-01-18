@@ -18,6 +18,7 @@ async function main(){
   await GraphNode.loadNodeTemplates();
   document.getElementById("top").insertAdjacentHTML("beforeend",graphFile);
   document.getElementById("saveButton").onclick = saveOnclick;
+  document.getElementById("uploadImageButton").onclick = ()=>{ window.location.href = domainName+"upload_image";};
 
 
   let canvas = document.getElementById("canvas");
@@ -40,6 +41,7 @@ async function main(){
   graph.interpretCommands(commandHistory);
 
   let ui = new UI(graph,canvas, context);
+  document.getElementById("centerGraphButton").onclick = ()=>{ui.resetView(); };
 }
 
 main();

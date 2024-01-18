@@ -8,19 +8,25 @@ pub struct ImageInputNode{
     username: String
 }
 
+
 impl ImageInputNode{
-    fn retrieve_image(&mut self){
+    fn retrieve_image(&mut self)->NodeResult<()>{
         let mut finalFile = self.filename.clone();
-        if finalFile != "dummy.png" {
-            finalFile = self.username.clone() + "_" + finalFile.as_str();
+        finalFile = crate::util::sanitize(&finalFile,false);
+        if(finalFile.is_empty()){
+            finalFile="dummy.png".to_owned();
         }
-        self.buffer = match image::open(crate::RESOURCE_PATH.clone()+r"\images\"+ finalFile.as_str()).unwrap(){
+        if finalFile != "dummy.png"{
+            finalFile = crate::util::sanitize(&self.username,true) + r"\" + finalFile.as_str();
+        }
+        self.buffer = match {match image::open(crate::util::RESOURCE_PATH.clone()+r"\images\"+ finalFile.as_str()){Ok(val)=>val,Err(_)=>return Err(NodeError::IOError(Self::get_node_name_static()))}}{
             DynamicImage::ImageRgba8(im) => im,
-            _ => panic!("unsupported Image")
+            _ => return Err(NodeError::IOError(Self::get_node_name_static()))
         };
+        Ok(())
     }
     pub fn new(username:String)->Self{
-        ImageInputNode { filename: "".to_string(), buffered: false, buffer: RgbaImage::default(), username }
+        ImageInputNode { filename: String::default(), buffered: false, buffer: RgbaImage::default(), username }
     }
 
 }
@@ -44,9 +50,7 @@ impl Node for ImageInputNode{
 
 
     fn clear_buffers(&mut self) {
-        self.buffered = false;
-        self.buffer = RgbaImage::default();
-        self.filename = String::default();
+        *self = ImageInputNode::new(self.username.clone());
     }
 
 
@@ -63,7 +67,7 @@ impl Node for ImageInputNode{
     fn get(&mut self, index: u16) -> NodeResult<NodeIOType> {
         self.generate_output_errors(&index)?;
         if !self.buffered {
-            self.retrieve_image();
+            self.retrieve_image()?;
             self.buffered =true;
         }
 

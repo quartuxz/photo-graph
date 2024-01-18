@@ -19,9 +19,7 @@ async function loginFormSubmit(){
         body: JSON.stringify(body)
     };
     let response = await fetch("/login", options);
-    let final = await response.text();
-    if(final!="fail"){
-        setCookie("session",final,2);
+    if(response.ok){
         document.getElementById("contextInner").innerHTML = initialHtml;
         window.location.href = domainName;
     }else{
@@ -33,4 +31,4 @@ async function loginFormSubmit(){
     }
 }
 
-document.getElementById("loginForm").onsubmit = () => {console.log("first"); loginFormSubmit(); return false;};
+document.getElementById("loginForm").onsubmit = () => {loginFormSubmit(); return false;};

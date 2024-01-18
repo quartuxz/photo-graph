@@ -42,7 +42,7 @@ impl NodeStatic for MathNode{
 
 impl Node for MathNode{
     fn clear_buffers(&mut self) {
-        self.buffered = false;
+        *self = MathNode::new();
     }
     fn set(&mut self, index: u16, value: NodeIOType) -> NodeResult<()> {
         self.generate_input_errors(&index, &value)?;

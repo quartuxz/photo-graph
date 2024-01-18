@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+
+<html>
+
+    <head>
+
+        <link rel="stylesheet" href="style.css">
+
+        <div class="top">
+        </div>
+    </head>
+    <body>
+
+        <div class="wrapper">
+            <div id="context">
+                <div id="contextInner"> 
+                    <form action="/upload" method="POST" enctype="multipart/form-data" id="upload">
+                        <label for="file">File:</label>
+                        <input id="file" name="file" type="file" /> <br>
+                        <label for="fileName">Save file as(exclude extension):</label> <br>
+                        <input type="text" id="fileName" name="fileName"></input>
+                        <input type="submit" value="upload"></input>
+                      </form>
+                </div>
+            </div>
+        </div>
+    </body>
+
+    <script src="utils.js"></script>
+    <script src="upload_image.js"></script>
+    
+    
+</html>

@@ -32,7 +32,7 @@ impl NodeStatic for RotationNode{
 impl Node for RotationNode{
 
     fn clear_buffers(&mut self) {
-        self.buffered = false;
+        *self = RotationNode::new();
     }
 
 
