@@ -2,7 +2,7 @@ use std::fs;
 
 
 lazy_static!{
-    pub static ref RESOURCE_PATH : String = r"C:\Users\Administrator\Desktop\rust\photo-graph\src\resources\".to_string();
+    pub static ref RESOURCE_PATH : String = r"C:\Users\Administrator\Desktop\rust\photo-graph-main\photo-graph\src\resources\".to_string();
     pub static ref SECRET : String = fs::read_to_string(r"C:\Users\Administrator\Desktop\secret.txt").unwrap();
     pub static ref DOMAIN: String = "http://127.0.0.1:8080".to_owned();
 }

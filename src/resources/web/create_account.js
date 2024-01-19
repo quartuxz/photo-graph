@@ -17,12 +17,12 @@ async function createFormSubmit(){
     };
     let response = await fetch("/createAccount", options);
     let final = await response.text();
-    if(final!="taken"){
+    if(final=="ok"){
         document.getElementById("contextInner").innerHTML = initialHtml;
         window.location.href = domainName+"login.html";
     }else{
         if(!incorrectCredsOnce){
-            document.getElementById("contextInner").insertAdjacentHTML("afterbegin", "USERNAME ALREADY TAKEN!");
+            document.getElementById("contextInner").insertAdjacentHTML("afterbegin", "USERNAME ALREADY TAKEN OR NOT ALLOWED!");
             incorrectCredsOnce = true;
         }
 

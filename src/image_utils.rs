@@ -1,5 +1,11 @@
 use image::{RgbaImage, Rgba, Pixel};
 
+pub fn inverse_of_add(foreground:&Rgba<u8>,background:&Rgba<u8>)->Rgba<u8>{
+    let mut result = saturating_add_rgba(foreground, background);
+    result.invert();
+    result
+}
+
 pub fn screen_formula(foreground:&Rgba<u8>,background:&Rgba<u8>)->Rgba<u8>{
     let mut finverted = foreground.clone();
     finverted.invert();

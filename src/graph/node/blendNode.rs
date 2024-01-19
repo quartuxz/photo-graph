@@ -3,13 +3,16 @@ use super::*;
 use std::convert::TryFrom;
 
 
+
 enum BlendMode{
     multiply,
     screen,
     darken,
     lighten,
     colorDodge,
-    colorBurn
+    colorBurn,
+    linearDodge,
+    linearBurn
 }
 
 impl TryFrom<i64> for BlendMode {
@@ -23,6 +26,8 @@ impl TryFrom<i64> for BlendMode {
             x if x == BlendMode::lighten as i64 => Ok(BlendMode::lighten),
             x if x == BlendMode::colorBurn as i64 => Ok(BlendMode::colorBurn),
             x if x == BlendMode::colorDodge as i64 => Ok(BlendMode::colorDodge),
+            x if x == BlendMode::linearDodge as i64 => Ok(BlendMode::linearDodge),
+            x if x == BlendMode::linearBurn as i64 => Ok(BlendMode::linearBurn),
             _ => Err(()),
         }
     }
@@ -56,6 +61,8 @@ impl NodeStatic for BlendNode{
         presetValues.push("lighten".to_string());
         presetValues.push("color dodge".to_string());
         presetValues.push("color burn".to_string());
+        presetValues.push("linear dodge".to_string());
+        presetValues.push("linear burn".to_string());
         vec![NodeInputOptions{name:"mode".to_string(),IOType: NodeIOType::IntType(0),canAlterDefault:true,hasConnection:false,presetValues:Some(presetValues),subtype:None},
             NodeInputOptions{name:"foreground".to_string(),IOType:NodeIOType::BitmapType(RgbaImage::default()),canAlterDefault:false,hasConnection:true,presetValues:None,subtype:None},
             NodeInputOptions{name:"background".to_string(),IOType:NodeIOType::BitmapType(RgbaImage::default()),canAlterDefault:false,hasConnection:true,presetValues:None,subtype:None},]
@@ -148,7 +155,25 @@ impl Node for BlendNode{
                     
                     *pixel = blend(&fpix, &bpix, color_burn_formula);
                     pixel.0[3] = fpix.0[3];
-                });}
+                });},
+                BlendMode::linearDodge=>{self.buffer.enumerate_pixels_mut().for_each(|(x,y,pixel)|{
+                    let mut fpix = match self.foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
+                    let mut bpix = match self.background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
+
+                    
+                    *pixel = blend(&fpix, &bpix, saturating_add_rgba);
+                    pixel.0[3] = fpix.0[3];
+                });},
+                BlendMode::linearBurn=>{
+                    self.buffer.enumerate_pixels_mut().for_each(|(x,y,pixel)|{
+                        let mut fpix = match self.foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
+                        let mut bpix = match self.background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
+    
+                        
+                        *pixel = blend(&fpix, &bpix, inverse_of_add);
+                        pixel.0[3] = fpix.0[3];
+                    });
+                }
             }
             self.buffered =true;
         }
