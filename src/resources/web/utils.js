@@ -1,4 +1,4 @@
-let domainName = "http://127.0.0.1:8080/";
+let domainName = "http://127.0.0.1:8080/web/";
 
 function setCookie(cname, cvalue, exdays) {
     const d = new Date();

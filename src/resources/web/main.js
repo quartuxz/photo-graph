@@ -18,7 +18,7 @@ async function main(){
   await GraphNode.loadNodeTemplates();
   document.getElementById("top").insertAdjacentHTML("beforeend",graphFile);
   document.getElementById("saveButton").onclick = saveOnclick;
-  document.getElementById("uploadImageButton").onclick = ()=>{ window.location.href = domainName+"upload_image";};
+  document.getElementById("uploadImageButton").onclick = ()=>{ window.location.href = domainName+"upload_image.html";};
 
 
   let canvas = document.getElementById("canvas");
@@ -27,17 +27,11 @@ async function main(){
 
   const options = {
     method: "POST",
-    headers: {
-      "Content-Type": "text",
-    },
-    body: graphID.toString()
   };
   let response = await fetch("/retrieveGraph", options);
-  if(response.status==401){window.location.href = domainName+"login";}
+  if(response.status==401){window.location.href = domainName+"login.html";}
   let commandHistory = await response.json();
-  if(commandHistory.isValid == "no" || graphFile == ""){
-    window.location.href = domainName;
-  }
+  
   graph.interpretCommands(commandHistory);
 
   let ui = new UI(graph,canvas, context);

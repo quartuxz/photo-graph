@@ -1,9 +1,12 @@
+
+
 let incorrectCredsOnce =  false;
 let initialHtml = document.getElementById("contextInner").innerHTML;
 
 
+document.getElementById("createLink").href = domainName+"create_account.html";
 
-async function createFormSubmit(){
+async function loginFormSubmit(){
     let username = document.getElementById("username").value;
     let password = document.getElementById("password").value;
 
@@ -15,18 +18,17 @@ async function createFormSubmit(){
         },
         body: JSON.stringify(body)
     };
-    let response = await fetch("/createAccount", options);
-    let final = await response.text();
-    if(final!="taken"){
+    let response = await fetch("/login", options);
+    if(response.ok){
         document.getElementById("contextInner").innerHTML = initialHtml;
-        window.location.href = domainName+"login";
+        window.location.href = domainName+"graph_selector.html";
     }else{
         if(!incorrectCredsOnce){
-            document.getElementById("contextInner").insertAdjacentHTML("afterbegin", "USERNAME ALREADY TAKEN!");
+            document.getElementById("contextInner").insertAdjacentHTML("afterbegin", "USERNAME OR PASSWORD NOT CORRECT!");
             incorrectCredsOnce = true;
         }
 
     }
 }
 
-document.getElementById("createForm").onsubmit = () => {createFormSubmit(); return false;};
+document.getElementById("loginForm").onsubmit = () => {loginFormSubmit(); return false;};

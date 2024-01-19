@@ -6,28 +6,21 @@ async function onsubmitCreateForm(){
     let graphFile = document.getElementById("graphName").value
     const options = {
         method: "POST",
-        headers: {
-            "Content-Type": "text",
-          },
-        body: graphFile
     };
     let response = await fetch("/createGraph", options);
-    if(response.status==401){window.location.href = domainName+"login";}
-    let graphID = Number(await response.text());
+    if(response.status==401){window.location.href = domainName+"login.html";}
     
     const options2 = {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({fileName:graphFile,graphID:graphID})
+        body: JSON.stringify({fileName:graphFile})
     };
     let response2 = await fetch("/saveGraph", options2);
-    if(response2.status==401){window.location.href = domainName+"login";}
-    setCookie("graphFile",graphFile,2);
-    setCookie("graphID",graphID,2);
+    if(response2.status==401){window.location.href = domainName+"login.html";}
     
-    window.location.href = domainName+"graph";
+    window.location.href = domainName+"main.html";
 
 }
 
@@ -53,11 +46,9 @@ function onsubmitLoadForm(){
                     body: graphFile
                 };
                 let response = await fetch("/loadGraph", options);
-                if(response.status==401){window.location.href = domainName+"login";}
-                let graphID = Number(await response.text());
-                setCookie("graphFile",graphFile,2);
-                setCookie("graphID",graphID,2);
-                window.location.href = domainName+"graph";
+                if(response.status==401){window.location.href = domainName+"login.html";}
+
+                window.location.href = domainName+"main.html";
             }
         }
     };
