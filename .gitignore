@@ -1,4 +1,4 @@
 /target
 
-photo-graph/resources/images/**
+photo-graph/src/resources/images/**
 sqlite.*
