@@ -383,6 +383,7 @@ async fn retrieve_node_templates()->impl Responder{
     descriptors.push(graph::node::blendNode::BlendNode::get_node_descriptor());
     descriptors.push(graph::node::moveNode::MoveNode::get_node_descriptor());
     descriptors.push(graph::node::rotationNode::RotationNode::get_node_descriptor());
+    descriptors.push(graph::node::resizeNode::ResizeNode::get_node_descriptor());
     HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&descriptors).unwrap())
 }
 
@@ -433,6 +434,9 @@ async fn sites(_req: HttpRequest, info: web::Path<Info>) -> impl Responder {
 
     let name = info.name.clone();
     let cleanName = util::sanitize(&name, false);
+    if cleanName.split(".").last() == Some("png"){
+        return HttpResponse::Ok().content_type("image/png").body(match std::fs::read(util::RESOURCE_PATH.clone()+r"web\" + &cleanName){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()});
+    }
     HttpResponse::Ok()
     .body(match std::fs::read_to_string(util::RESOURCE_PATH.clone()+r"web\" + &cleanName){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()})
 }

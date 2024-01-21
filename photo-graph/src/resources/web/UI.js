@@ -224,13 +224,19 @@ class UI{
     }
 
     async process(){
+      this.background.src = "loading.png";
       const options = {
         method: "POST",
         headers: {
           "Content-Type": "text",
         }
       };
-      fetch("/process",options).then(response=>{ if(response.status==401){window.location.href = domainName+"login";} response.blob().then(blobResponse => {let url =window.URL.createObjectURL(blobResponse); this.background.src=url;document.getElementById("downloadButton").href=url;});});
+      let response = await fetch("/process",options);
+      if(response.status==401){window.location.href = domainName+"login";}
+      let blobResponse = await response.blob();
+      let url =window.URL.createObjectURL(blobResponse);
+      this.background.src=url;
+      document.getElementById("downloadButton").href=url;
     }
 
     #drawTransparencyBackground(){

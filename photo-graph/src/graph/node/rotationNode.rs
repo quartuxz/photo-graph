@@ -4,7 +4,16 @@ use crate::image_utils::{multiply_color, saturating_add_rgba};
 
 use super::*;
 
+
+#[derive(macro_utils::TryFrom)]
+#[conversion_type(i64)]
+enum RotationMode{
+    fast,
+    precise
+}
+
 pub struct RotationNode{
+    mode: RotationMode,
     rotating:RgbaImage,
     angle:f64,
     buffer:RgbaImage,
@@ -13,14 +22,19 @@ pub struct RotationNode{
 
 impl RotationNode{
     pub fn new()->Self{
-        RotationNode { rotating: RgbaImage::default(), angle: 0.0, buffered: false, buffer:RgbaImage::default() }
+        RotationNode { mode: RotationMode::fast,rotating: RgbaImage::default(), angle: 0.0, buffered: false, buffer:RgbaImage::default() }
     }
 
 }
 
 impl NodeStatic for RotationNode{
     fn get_inputs_static()->Vec<NodeInputOptions>{
-        vec![NodeInputOptions{name:"rotating".to_string(),IOType: NodeIOType::BitmapType(RgbaImage::default()),canAlterDefault:false,hasConnection:true, presetValues:None,subtype:None},
+        let mut presetValues = vec![];
+        presetValues.push("fast".to_string());
+        presetValues.push("precise".to_string());
+        vec![
+            NodeInputOptions{name:"mode".to_string(),IOType:NodeIOType::IntType(0),canAlterDefault:true,hasConnection:false,presetValues:Some(presetValues),subtype:None},
+            NodeInputOptions{name:"rotating".to_string(),IOType: NodeIOType::BitmapType(RgbaImage::default()),canAlterDefault:false,hasConnection:true, presetValues:None,subtype:None},
             NodeInputOptions{name: "angle".to_string(),IOType: NodeIOType::FloatType(0.0),canAlterDefault:true,hasConnection:true, presetValues:None,subtype:None}]
     }
 
@@ -43,10 +57,16 @@ impl Node for RotationNode{
     fn set(&mut self, index: u16, value: NodeIOType) -> NodeResult<()> {
         self.generate_input_errors(&index, &value)?;
         match index {
-            0 => if let NodeIOType::BitmapType(image) = value{
+            0=> if let NodeIOType::IntType(mode) = value{
+                self.mode = match mode.try_into(){
+                    Ok(val)=>val,
+                    Err(_)=> return Err(NodeError::InvalidInput(Self::get_node_name_static(), value, index))
+                };
+            },
+            1 => if let NodeIOType::BitmapType(image) = value{
                 self.rotating = image;
             },
-            1 => if let NodeIOType::FloatType(angle) = value{
+            2 => if let NodeIOType::FloatType(angle) = value{
                 self.angle = angle*(std::f64::consts::PI/180.0);
             },
 
@@ -61,7 +81,6 @@ impl Node for RotationNode{
     fn get(&mut self, index: u16) -> NodeResult<NodeIOType> {
         self.generate_output_errors(&index)?;
         if !self.buffered {
-            let mut rotatedPixels:Vec<(f64,f64)> = Vec::new();
             let mut minX = f64::MAX;
             let mut minY = f64::MAX; 
             let mut maxX = f64::MIN;
@@ -86,47 +105,68 @@ impl Node for RotationNode{
 
             
             self.angle = -self.angle;
-            self.buffer = RgbaImage::from_fn((maxX-minX).ceil() as u32, (maxY-minY).ceil() as u32, |x,y|{
-                let mut rotX = ((x as f64)-halfWidth+minX)*self.angle.cos()-((y as f64)-halfHeight+minY)*self.angle.sin();
-                let mut rotY = ((x as f64)-halfWidth+minX)*self.angle.sin()+((y as f64)-halfHeight+minY)*self.angle.cos();
-                rotX += halfWidth;
-                rotY += halfHeight;
-                match self.rotating.get_pixel_checked((rotX.round()) as u32, (rotY.round()) as u32){
-                    Some(val) if rotX>0.0 && rotY >0.0=> val.clone(),
-                    Some(_) => Rgba([0,0,0,0]),
-                    None => Rgba([0,0,0,0])
+            match self.mode{
+                RotationMode::precise =>{
+                    self.buffer = RgbaImage::from_fn((maxX-minX).ceil() as u32, (maxY-minY).ceil() as u32, |x,y|{
+                        let mut rotX = ((x as f64)-halfWidth+minX)*self.angle.cos()-((y as f64)-halfHeight+minY)*self.angle.sin();
+                        let mut rotY = ((x as f64)-halfWidth+minX)*self.angle.sin()+((y as f64)-halfHeight+minY)*self.angle.cos();
+                        rotX += halfWidth;
+                        rotY += halfHeight;
+                        let mut finalPix = Rgba([0,0,0,0]);
+                        //top left
+                        {
+                            let source = match self.rotating.get_pixel_checked((rotX.floor()) as u32, (rotY.floor()) as u32){
+                                Some(val) if rotX>0.0 && rotY >0.0=> val.clone(),
+                                Some(_) => Rgba([0,0,0,0]),
+                                None => Rgba([0,0,0,0])
+                            };
+                            finalPix = saturating_add_rgba(&finalPix, &multiply_color(&source, (((rotX.floor()+1.0) - (rotX))*((rotY.floor()+1.0)-(rotY))).abs() as f32))
+                        }
+                        if rotX.floor() != rotX.ceil(){
+                            let source = match self.rotating.get_pixel_checked((rotX.ceil()) as u32, (rotY.floor()) as u32){
+                                Some(val) if rotX>0.0 && rotY >0.0=> val.clone(),
+                                Some(_) => Rgba([0,0,0,0]),
+                                None => Rgba([0,0,0,0])
+                            };
+                            finalPix = saturating_add_rgba(&finalPix, &multiply_color(&source, (((rotX.floor()+1.0) - (rotX+1.0))*((rotY.floor()+1.0)-(rotY))).abs() as f32))
+                        }
+                        if rotY.floor() != rotY.ceil(){
+                            let source = match self.rotating.get_pixel_checked((rotX.floor()) as u32, (rotY.ceil()) as u32){
+                                Some(val) if rotX>0.0 && rotY >0.0=> val.clone(),
+                                Some(_) => Rgba([0,0,0,0]),
+                                None => Rgba([0,0,0,0])
+                            };
+                            finalPix = saturating_add_rgba(&finalPix, &multiply_color(&source, (((rotX.floor()+1.0) - (rotX))*((rotY.floor()+1.0)-(rotY+1.0))).abs() as f32))
+                        }
+                        if rotX.floor() != rotX.ceil() && rotY.floor() != rotY.ceil(){
+                            let source = match self.rotating.get_pixel_checked((rotX.ceil()) as u32, (rotY.ceil()) as u32){
+                                Some(val) if rotX>0.0 && rotY >0.0=> val.clone(),
+                                Some(_) => Rgba([0,0,0,0]),
+                                None => Rgba([0,0,0,0])
+                            };
+                            finalPix = saturating_add_rgba(&finalPix, &multiply_color(&source, (((rotX.floor()+1.0) - (rotX+1.0))*((rotY.floor()+1.0)-(rotY+1.0))).abs() as f32))
+                        }
+                        finalPix
+                    });
                 }
-
-            });
-            self.angle = -self.angle;
-
-
-            for px in &mut rotatedPixels{
-                px.0 = px.0-minX;
-                px.1 = px.1-minY;
-                
-
-                // {
-                //     let dest = self.buffer.get_pixel_mut(px.0.floor() as u32, px.1.floor() as u32);
-                //     *dest = saturating_add_rgba(&multiply_color(&px.2, (((px.0.floor()+1.0) - (px.0))*((px.1.floor()+1.0)-(px.1))).abs() as f32),&dest);
-                // }
-                // if px.0.ceil() != px.0.floor(){
-                //     let dest = self.buffer.get_pixel_mut(px.0.ceil() as u32, px.1.floor() as u32);
-                //     *dest = saturating_add_rgba(&multiply_color(&px.2, (((px.0.floor()+1.0) - (px.0+1.0))*((px.1.floor()+1.0)-(px.1))).abs() as f32),&dest);
-                // }
-                // if px.1.ceil() != px.1.floor(){
-                //     let dest = self.buffer.get_pixel_mut(px.0.floor() as u32, px.1.ceil() as u32);
-                //     *dest = saturating_add_rgba(&multiply_color(&px.2, (((px.0.floor()+1.0) - (px.0))*((px.1.floor()+1.0)-(px.1+1.0))).abs() as f32),&dest);
-                // }
-                // if px.1.ceil() != px.1.floor() && px.0.ceil() != px.0.floor(){
-                //     let dest = self.buffer.get_pixel_mut(px.0.ceil() as u32, px.1.ceil() as u32);
-                //     *dest = saturating_add_rgba(&multiply_color(&px.2, (((px.0.floor()+1.0) - (px.0+1.0))*((px.1.floor()+1.0)-(px.1+1.0))).abs() as f32),&dest);
-                // }
-
+                RotationMode::fast => {
+                    self.buffer = RgbaImage::from_fn((maxX-minX).ceil() as u32, (maxY-minY).ceil() as u32, |x,y|{
+                        let mut rotX = ((x as f64)-halfWidth+minX)*self.angle.cos()-((y as f64)-halfHeight+minY)*self.angle.sin();
+                        let mut rotY = ((x as f64)-halfWidth+minX)*self.angle.sin()+((y as f64)-halfHeight+minY)*self.angle.cos();
+                        rotX += halfWidth;
+                        rotY += halfHeight;
+                        
+                        match self.rotating.get_pixel_checked((rotX.round()) as u32, (rotY.round()) as u32){
+                            Some(val) if rotX>0.0 && rotY >0.0=> val.clone(),
+                            Some(_) => Rgba([0,0,0,0]),
+                            None => Rgba([0,0,0,0])
+                        }
+                            
+                    });
+                }
             }
 
-
-
+            self.angle = -self.angle;
 
 
             self.buffered =true;

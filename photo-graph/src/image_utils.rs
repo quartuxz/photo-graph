@@ -1,5 +1,13 @@
 use image::{RgbaImage, Rgba, Pixel};
 
+
+pub fn return_non_empty(image:&RgbaImage)->RgbaImage{
+    if image.is_empty(){
+        return RgbaImage::from_fn(500, 500, |x,y|{Rgba([100,0,50,255])});
+    }
+    image.clone()
+}
+
 pub fn inverse_of_add(foreground:&Rgba<u8>,background:&Rgba<u8>)->Rgba<u8>{
     let mut result = saturating_add_rgba(foreground, background);
     result.invert();

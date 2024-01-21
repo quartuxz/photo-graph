@@ -1,3 +1,5 @@
+use crate::image_utils::return_non_empty;
+
 use super::*;
 
 use image::{ImageBuffer};
@@ -15,7 +17,7 @@ impl FinalNode{
 
 impl NodeStatic for FinalNode{
     fn get_inputs_static()->Vec<NodeInputOptions>{
-        vec![NodeInputOptions{IOType:NodeIOType::BitmapType(ImageBuffer::from_fn(500, 500, |_x,_y| {Rgba([100,0,50,255])})), canAlterDefault:false,hasConnection:true, name:"bitmap".to_string(), presetValues:None,subtype:None}]
+        vec![NodeInputOptions{IOType:NodeIOType::BitmapType(return_non_empty(&RgbaImage::default())), canAlterDefault:false,hasConnection:true, name:"bitmap".to_string(), presetValues:None,subtype:None}]
     }
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{
@@ -37,7 +39,7 @@ impl Node for FinalNode{
         self.generate_output_errors(&index)?;
         if self.bitmap.is_empty(){
             
-            return NodeResult::Ok(NodeIOType::BitmapType(RgbaImage::from_fn(500, 500, |_x,_y|{Rgba([100,0,50,255])})));
+            return NodeResult::Ok(NodeIOType::BitmapType(return_non_empty(&RgbaImage::default())));
         }
         NodeResult::Ok(NodeIOType::BitmapType(self.bitmap.clone()))
     }

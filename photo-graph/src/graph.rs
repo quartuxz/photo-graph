@@ -84,6 +84,26 @@ impl Graph{
         self.user.clone()
     }
 
+    //optimization to use only nodes connected to the desired node for things like processing the graph.
+    fn get_edges_connnected_to(&self, nodeID:usize)->Vec<(usize, Edge)>{
+        let mut searching_connected_to : Vec<usize> = vec![nodeID];
+        let mut retval : Vec<(usize, Edge)> = vec![];
+        while !searching_connected_to.is_empty(){
+            let mut new_connections : Vec<usize> = vec![];
+            for connection in &searching_connected_to{
+                for edge in &self.edges{
+                    if edge.1.inputNode == *connection{
+                        retval.push(edge.clone());
+                        new_connections.push(edge.1.outputNode);
+                    }
+                }
+            }
+            searching_connected_to = new_connections;
+
+        }
+        retval
+
+    }
     //processes the final bitmap output for a graph.
     pub fn process(&mut self)->RgbaImage{
 
@@ -92,7 +112,7 @@ impl Graph{
         let mut layer = 0;
         while includes {
             includes = false;
-            for edge in & mut self.edges{
+            for edge in self.get_edges_connnected_to(0){
                 if edge.0 == layer {
                     let val = self.nodes.get_mut(&edge.1.outputNode).unwrap().get(edge.1.outputIndex).unwrap();
                     self.nodes.get_mut(&edge.1.inputNode).unwrap().set(edge.1.inputIndex, val).unwrap();
@@ -331,6 +351,8 @@ impl Graph{
                     self.add_node(Box::new(node::moveNode::MoveNode::new()));
                 }else if cmd.args[0] == node::rotationNode::RotationNode::get_node_name_static(){
                     self.add_node(Box::new(node::rotationNode::RotationNode::new()));
+                }else if cmd.args[0] == node::resizeNode::ResizeNode::get_node_name_static(){
+                    self.add_node(Box::new(node::resizeNode::ResizeNode::new()));
                 }
                 "removeNode" => self.remove_node(cmd.args[0].parse().unwrap(),true)?,
                 "moveNode" => (),

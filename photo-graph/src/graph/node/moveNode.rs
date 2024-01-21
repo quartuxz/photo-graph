@@ -91,23 +91,24 @@ impl Node for MoveNode{
 
             match self.mode{
                 MoveMode::clamp=>{
-                if self.moving.width() as i32 + roundedX <= 0{
-                    return Err(NodeError::InvalidInput(Self::get_node_name_static(), NodeIOType::FloatType(self.x), 1))
-                }
-                if self.moving.height() as i32 + roundedY <= 0{
-                    return Err(NodeError::InvalidInput(Self::get_node_name_static(), NodeIOType::FloatType(self.y), 2))
-                }
-                self.buffer = RgbaImage::from_fn(self.moving.width(),self.moving.height() , 
-                |x,y|{
-                    let imageX = x as i32 - roundedX;
-                    let imageY = y as i32 - roundedY;
-                    if(imageX < 0 || imageY < 0 || imageX >= self.moving.width() as i32 || imageY >= self.moving.height() as i32){
-                        Rgba([0,0,0,0])
-                    }else{
-                        self.moving.get_pixel(imageX as u32, imageY as u32).clone()
+                    if self.moving.width() as i32 + roundedX <= 0{
+                        return Err(NodeError::InvalidInput(Self::get_node_name_static(), NodeIOType::FloatType(self.x), 1))
                     }
-                
-                });},
+                    if self.moving.height() as i32 + roundedY <= 0{
+                        return Err(NodeError::InvalidInput(Self::get_node_name_static(), NodeIOType::FloatType(self.y), 2))
+                    }
+                    self.buffer = RgbaImage::from_fn(self.moving.width(),self.moving.height() , 
+                    |x,y|{
+                        let imageX = x as i32 - roundedX;
+                        let imageY = y as i32 - roundedY;
+                        if(imageX < 0 || imageY < 0 || imageX >= self.moving.width() as i32 || imageY >= self.moving.height() as i32){
+                            Rgba([0,0,0,0])
+                        }else{
+                            self.moving.get_pixel(imageX as u32, imageY as u32).clone()
+                        }
+                    
+                    });
+                },
                 MoveMode::extend=>{
                     if self.moving.width() as i32 + roundedX <= 0{
                         return Err(NodeError::InvalidInput(Self::get_node_name_static(), NodeIOType::FloatType(self.x), 1))
