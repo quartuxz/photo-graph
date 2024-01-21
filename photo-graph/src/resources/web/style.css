@@ -1,6 +1,12 @@
+
+
 body{
     margin:0;
     padding:0;
+}
+
+.navbarButton{
+    height: 100%;
 }
 
 .top{

@@ -1,4 +1,3 @@
-let graphID = Number(getCookie("graphID"));
 let graphFile = getCookie("graphFile");
 
 
@@ -405,7 +404,7 @@ class NodeIO{
     
     async #registerCommands(commands){
         //commands are sent to be executed server-side
-        let body = {commands:commands, graphID:graphID};
+        let body = {commands:commands};
         const options = {
           method: "POST",
           headers: {

@@ -4,28 +4,18 @@ use super::*;
 use std::convert::TryFrom;
 
 
+#[derive(macro_utils::TryFrom)]
+#[conversion_type(i64)]
 enum CompositionType{
     overlay,
     mask,
     inverseMask,
     atop,
-    neither
+    neither,
+    foreground
 }
 
-impl TryFrom<i64> for CompositionType {
-    type Error = ();
 
-    fn try_from(v: i64) -> Result<Self, Self::Error> {
-        match v {
-            x if x == CompositionType::mask as i64 => Ok(CompositionType::mask),
-            x if x == CompositionType::overlay as i64 => Ok(CompositionType::overlay),
-            x if x == CompositionType::inverseMask as i64 => Ok(CompositionType::inverseMask),
-            x if x == CompositionType::atop as i64 => Ok(CompositionType::atop),
-            x if x == CompositionType::neither as i64 => Ok(CompositionType::neither),
-            _ => Err(()),
-        }
-    }
-}
 pub struct ComposeNode{
     operation:CompositionType,
     buffer : RgbaImage,
@@ -54,6 +44,7 @@ impl NodeStatic for ComposeNode{
         presetValues.push("inverse mask".to_string());
         presetValues.push("atop".to_string());
         presetValues.push("neither".to_string());
+        presetValues.push("foreground".to_string());
         vec![NodeInputOptions{name:"mode".to_string(),IOType: NodeIOType::IntType(0),canAlterDefault:true,hasConnection:false,presetValues:Some(presetValues),subtype:None},
             NodeInputOptions{name:"foreground".to_string(),IOType:NodeIOType::BitmapType(RgbaImage::default()),canAlterDefault:false,hasConnection:true,presetValues:None,subtype:None},
             NodeInputOptions{name:"background".to_string(),IOType:NodeIOType::BitmapType(RgbaImage::default()),canAlterDefault:false,hasConnection:true,presetValues:None,subtype:None},]
@@ -162,7 +153,15 @@ impl Node for ComposeNode{
                     fpix = multiply_color(&fpix, 1.0-balpha);
                     bpix = multiply_color(&bpix, 1.0-falpha);
                     *pixel = saturating_add_rgba(&fpix, &bpix);
-                });}
+                });},
+                CompositionType::foreground=>{self.buffer.enumerate_pixels_mut().for_each(|(x,y,pixel)|{
+                    //source
+                    let mut fpix = match self.foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
+                    *pixel = fpix;
+                })
+
+                }
+
             }
             self.buffered =true;
         }

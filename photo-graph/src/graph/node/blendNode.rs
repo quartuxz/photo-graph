@@ -3,7 +3,8 @@ use super::*;
 use std::convert::TryFrom;
 
 
-
+#[derive(macro_utils::TryFrom)]
+#[conversion_type(i64)]
 enum BlendMode{
     multiply,
     screen,
@@ -15,23 +16,6 @@ enum BlendMode{
     linearBurn
 }
 
-impl TryFrom<i64> for BlendMode {
-    type Error = ();
-
-    fn try_from(v: i64) -> Result<Self, Self::Error> {
-        match v {
-            x if x == BlendMode::multiply as i64 => Ok(BlendMode::multiply),
-            x if x == BlendMode::screen as i64 => Ok(BlendMode::screen),
-            x if x == BlendMode::darken as i64 => Ok(BlendMode::darken),
-            x if x == BlendMode::lighten as i64 => Ok(BlendMode::lighten),
-            x if x == BlendMode::colorBurn as i64 => Ok(BlendMode::colorBurn),
-            x if x == BlendMode::colorDodge as i64 => Ok(BlendMode::colorDodge),
-            x if x == BlendMode::linearDodge as i64 => Ok(BlendMode::linearDodge),
-            x if x == BlendMode::linearBurn as i64 => Ok(BlendMode::linearBurn),
-            _ => Err(()),
-        }
-    }
-}
 pub struct BlendNode{
     operation:BlendMode,
     buffer : RgbaImage,
@@ -108,72 +92,14 @@ impl Node for BlendNode{
         if !self.buffered {
             self.buffer = RgbaImage::from_fn(std::cmp::max(self.foreground.width(),self.background.width()), std::cmp::max(self.foreground.height(),self.background.height()), |_x,_y| {Rgba([0,0,0,0])});
             match self.operation{
-                BlendMode::multiply=>{self.buffer.enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-                    let mut fpix = match self.foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let mut bpix = match self.background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-
-                    
-                    *pixel = blend(&fpix, &bpix, multiply_rgba_by_rgba);
-                    pixel.0[3] = fpix.0[3];
-                });},
-                BlendMode::screen=>{self.buffer.enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-                    let mut fpix = match self.foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let mut bpix = match self.background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-
-                    
-                    *pixel = blend(&fpix, &bpix, screen_formula);
-                    pixel.0[3] = fpix.0[3];
-                });},
-                BlendMode::darken=>{self.buffer.enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-                    let mut fpix = match self.foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let mut bpix = match self.background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-
-                    
-                    *pixel = blend(&fpix, &bpix, darken_formula);
-                    pixel.0[3] = fpix.0[3];
-                });},
-                BlendMode::lighten=>{self.buffer.enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-                    let mut fpix = match self.foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let mut bpix = match self.background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-
-                    
-                    *pixel = blend(&fpix, &bpix, lighten_formula);
-                    pixel.0[3] = fpix.0[3];
-                });},
-                BlendMode::colorDodge =>{self.buffer.enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-                    let mut fpix = match self.foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let mut bpix = match self.background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-
-                    
-                    *pixel = blend(&fpix, &bpix, color_dodge_formula);
-                    pixel.0[3] = fpix.0[3];
-                });},
-                BlendMode::colorBurn=>{self.buffer.enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-                    let mut fpix = match self.foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let mut bpix = match self.background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-
-                    
-                    *pixel = blend(&fpix, &bpix, color_burn_formula);
-                    pixel.0[3] = fpix.0[3];
-                });},
-                BlendMode::linearDodge=>{self.buffer.enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-                    let mut fpix = match self.foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let mut bpix = match self.background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-
-                    
-                    *pixel = blend(&fpix, &bpix, saturating_add_rgba);
-                    pixel.0[3] = fpix.0[3];
-                });},
-                BlendMode::linearBurn=>{
-                    self.buffer.enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-                        let mut fpix = match self.foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                        let mut bpix = match self.background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-    
-                        
-                        *pixel = blend(&fpix, &bpix, inverse_of_add);
-                        pixel.0[3] = fpix.0[3];
-                    });
-                }
+                BlendMode::multiply=>{macro_utils::make_blend!(multiply_rgba_by_rgba);},
+                BlendMode::screen=>{macro_utils::make_blend!(screen_formula);},
+                BlendMode::darken=>{macro_utils::make_blend!(darken_formula);},
+                BlendMode::lighten=>{macro_utils::make_blend!(lighten_formula);},
+                BlendMode::colorDodge =>{macro_utils::make_blend!(color_dodge_formula);},
+                BlendMode::colorBurn=>{macro_utils::make_blend!(color_burn_formula);},
+                BlendMode::linearDodge=>{macro_utils::make_blend!(saturating_add_rgba);},
+                BlendMode::linearBurn=>{macro_utils::make_blend!(inverse_of_add);}
             }
             self.buffered =true;
         }

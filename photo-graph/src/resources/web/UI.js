@@ -89,8 +89,10 @@ class ContextMenu{
         return;
       }
       contents += "<input type=\"submit\" value=\"Change\"></input>  </form>";
+      contents += "<button id=\"deleteButton\">delete</button>";
       document.getElementById("contextInner").innerHTML = contents;
       document.getElementById("manipulateForm").onsubmit = () => {this.onSubmitManipulate(); return false;};
+      document.getElementById("deleteButton").onclick = () =>{this.ui.changeContextMenu("default",null); this.ui.graph.removeNode(this.selected.id); this.ui.process()};
 
 
     }else if(type=="create"){
@@ -211,7 +213,7 @@ class UI{
       return Vec2(evt.clientX - rect.left, evt.clientY - rect.top);
     }
   
-    #changeContextMenu(type, parameter){
+    changeContextMenu(type, parameter){
 
       if(this.contextMenu.selected != null){
         this.contextMenu.selected.selected = false;
@@ -226,10 +228,9 @@ class UI{
         method: "POST",
         headers: {
           "Content-Type": "text",
-        },
-        body: graphID.toString()
+        }
       };
-      fetch("/process",options).then(response=>{ if(response.status==401){window.location.href = domainName+"login";} response.blob().then(blobResponse => {this.background.src=window.URL.createObjectURL(blobResponse);});});
+      fetch("/process",options).then(response=>{ if(response.status==401){window.location.href = domainName+"login";} response.blob().then(blobResponse => {let url =window.URL.createObjectURL(blobResponse); this.background.src=url;document.getElementById("downloadButton").href=url;});});
     }
 
     #drawTransparencyBackground(){
@@ -262,7 +263,7 @@ class UI{
       this.context.clearRect(0,0,this.canvas.width,this.canvas.height);
       this.#drawTransparencyBackground();
       //draw background image
-      if(this.background.width > this.background.height){
+      if(this.canvas.width < this.canvas.height){
         this.context.drawImage(this.background,0,(this.canvas.height-this.background.height*(this.canvas.width/this.background.width))/2,this.canvas.width,this.background.height*(this.canvas.width/this.background.width));
       }else{
         this.context.drawImage(this.background,(this.canvas.width-this.background.width*(this.canvas.height/this.background.height))/2,0,this.background.width*(this.canvas.height/this.background.height),this.canvas.height);
@@ -287,11 +288,11 @@ class UI{
 
           if(this.selecting.type == "node"){
             
-            this.#changeContextMenu("manipulate",this.selecting.node);
+            this.changeContextMenu("manipulate",this.selecting.node);
           }
 
           if(this.selecting.type == "input"){
-            this.#changeContextMenu("default",null);
+            this.changeContextMenu("default",null);
             let manipulatedLine = this.graph.getLineByInput(this.selecting.node.id,this.selecting.IOSocket);
             if(manipulatedLine != null){
               this.graph.removeLine(manipulatedLine);
@@ -445,14 +446,14 @@ class UI{
       let transformed = this.graph.getTransformedPos(mousePos);
       //let transformed = Vec2(mousePos.x*transform.a+mousePos.y*transform.c + transform.e, mousePos.x*transform.b+mousePos.y*transform.d+transform.f);
       transformed.z = 1;
-      this.#changeContextMenu("create",transformed);
+      this.changeContextMenu("create",transformed);
       this.draw();
     }
 
     keydown(evt){
       let code = evt.keyCode;
       switch(code){
-        case 88: if(this.selecting != null && this.selecting.node.id != 0){this.#changeContextMenu("default",null); this.graph.removeNode(this.selecting.node.id); this.process()};
+        case 88: if(this.selecting != null && this.selecting.node.id != 0){this.changeContextMenu("default",null); this.graph.removeNode(this.selecting.node.id); this.process()};
         default: ;
       }
     }

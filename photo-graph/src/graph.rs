@@ -327,6 +327,10 @@ impl Graph{
                     self.add_node(Box::new(node::composeNode::ComposeNode::new()));
                 }else if cmd.args[0] == node::blendNode::BlendNode::get_node_name_static(){
                     self.add_node(Box::new(node::blendNode::BlendNode::new()));
+                }else if cmd.args[0] == node::moveNode::MoveNode::get_node_name_static(){
+                    self.add_node(Box::new(node::moveNode::MoveNode::new()));
+                }else if cmd.args[0] == node::rotationNode::RotationNode::get_node_name_static(){
+                    self.add_node(Box::new(node::rotationNode::RotationNode::new()));
                 }
                 "removeNode" => self.remove_node(cmd.args[0].parse().unwrap(),true)?,
                 "moveNode" => (),

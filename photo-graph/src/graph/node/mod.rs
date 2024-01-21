@@ -10,6 +10,7 @@ pub mod mathNode;
 pub mod colorToImageNode;
 pub mod composeNode;
 pub mod blendNode;
+pub mod moveNode;
 
 use std::{vec, result, fmt};
 use serde::{Serialize, Serializer, ser::SerializeStruct};

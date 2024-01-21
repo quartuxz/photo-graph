@@ -35,6 +35,10 @@ impl Node for FinalNode{
 
     fn get(&mut self, index: u16) -> NodeResult<NodeIOType> {
         self.generate_output_errors(&index)?;
+        if self.bitmap.is_empty(){
+            
+            return NodeResult::Ok(NodeIOType::BitmapType(RgbaImage::from_fn(500, 500, |_x,_y|{Rgba([100,0,50,255])})));
+        }
         NodeResult::Ok(NodeIOType::BitmapType(self.bitmap.clone()))
     }
     fn set(&mut self, index: u16, value:NodeIOType) -> NodeResult<()> {

@@ -1701,6 +1701,7 @@ dependencies = [
  "image",
  "jsonwebtoken",
  "lazy_static",
+ "macro-utils",
  "rusttype",
  "serde",
  "serde_json",

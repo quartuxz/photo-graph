@@ -1,2 +1,3 @@
 [workspace]
 members = ["photo-graph", "macro-utils"]
+resolver = "2"

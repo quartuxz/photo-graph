@@ -1,3 +1,4 @@
 /target
 
-photograph/sqlite.db*
+photo-graph/resources/images/**
+sqlite.*

@@ -1,5 +1,4 @@
 
-console.log(getCookie("session"));
 
 let graphFiles = null;
 async function onsubmitCreateForm(){
@@ -20,6 +19,8 @@ async function onsubmitCreateForm(){
     let response2 = await fetch("/saveGraph", options2);
     if(response2.status==401){window.location.href = domainName+"login.html";}
     
+    setCookie("graphFile",graphFile,9999);
+
     window.location.href = domainName+"main.html";
 
 }
@@ -47,7 +48,7 @@ function onsubmitLoadForm(){
                 };
                 let response = await fetch("/loadGraph", options);
                 if(response.status==401){window.location.href = domainName+"login.html";}
-
+                setCookie("graphFile",graphFile,9999);
                 window.location.href = domainName+"main.html";
             }
         }

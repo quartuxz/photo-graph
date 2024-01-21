@@ -6,11 +6,12 @@ function saveOnclick(){
       headers: {
           "Content-Type": "application/json",
       },
-      body: JSON.stringify({fileName:graphFile,graphID:graphID})
+      body: JSON.stringify({fileName:graphFile})
   };
   fetch("/saveGraph", options);
   return true;
 }
+
 
 
 async function main(){

@@ -381,6 +381,8 @@ async fn retrieve_node_templates()->impl Responder{
     descriptors.push(graph::node::colorToImageNode::ColorToImageNode::get_node_descriptor());
     descriptors.push(graph::node::composeNode::ComposeNode::get_node_descriptor());
     descriptors.push(graph::node::blendNode::BlendNode::get_node_descriptor());
+    descriptors.push(graph::node::moveNode::MoveNode::get_node_descriptor());
+    descriptors.push(graph::node::rotationNode::RotationNode::get_node_descriptor());
     HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&descriptors).unwrap())
 }
 

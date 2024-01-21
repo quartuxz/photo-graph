@@ -19,10 +19,7 @@ impl ImageInputNode{
         if finalFile != "dummy.png"{
             finalFile = crate::util::sanitize(&self.username,true) + r"\" + finalFile.as_str();
         }
-        self.buffer = match {match image::open(crate::util::RESOURCE_PATH.clone()+r"\images\"+ finalFile.as_str()){Ok(val)=>val,Err(_)=>return Err(NodeError::IOError(Self::get_node_name_static()))}}{
-            DynamicImage::ImageRgba8(im) => im,
-            _ => return Err(NodeError::IOError(Self::get_node_name_static()))
-        };
+        self.buffer = match image::open(crate::util::RESOURCE_PATH.clone()+r"\images\"+ finalFile.as_str()){Ok(val)=>val,Err(_)=>return Err(NodeError::IOError(Self::get_node_name_static()))}.into_rgba8();
         Ok(())
     }
     pub fn new(username:String)->Self{
