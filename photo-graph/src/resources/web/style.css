@@ -1,5 +1,22 @@
 
 
+.centerNavbar{
+    position: absolute; 
+    top:50%;
+    left: 50%; 
+    transform: translate(-50%, -50%); 
+    font-size:xx-large;
+    
+}
+
+.cornerNavbar{
+    position:absolute;
+    right: 2%;
+    top:50%;
+    transform: translate(0%, -50%); 
+
+}
+
 body{
     margin:0;
     padding:0;
@@ -10,14 +27,12 @@ body{
 }
 
 .top{
+    position: relative;
     background-color: coral;
     height: 30px;
     display:flex;
 }
 
-.top > ul{
-    margin: auto;
-}
 
 .wrapper {
     display: flex;

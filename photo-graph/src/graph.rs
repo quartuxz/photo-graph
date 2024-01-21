@@ -2,10 +2,10 @@ pub mod node;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use std::{collections::HashMap, fmt};
+use std::{cell::RefCell, collections::HashMap, fmt, num::ParseIntError, str::FromStr};
 use crate::graph::node::{NodeStatic};
 
-use self::node::{Node, NodeIOType, NodeInputOptions};
+use self::node::{Node, NodeError, NodeIOType, NodeInputOptions};
 use image::RgbaImage;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -55,7 +55,7 @@ pub struct Graph{
 
 }
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug,PartialEq)]
 pub enum GraphError{
     #[error("The graph has a cycle!")]
     Cycle,
@@ -68,11 +68,20 @@ pub enum GraphError{
     #[error("The command does not exist!")]
     UnknownCommand,
     #[error("The command is ill-formed")]
-    IllFormedCommand
+    IllFormedCommand,
+    #[error("node error")]
+    NError(#[from] node::NodeError),
+}
+
+impl From<ParseIntError> for GraphError{
+    fn from(_: ParseIntError) -> Self {
+        GraphError::IllFormedCommand
+    }
 }
 
 
 pub type GraphResult<T> = Result<T, GraphError>;
+
 
 impl Graph{
 
@@ -105,7 +114,7 @@ impl Graph{
 
     }
     //processes the final bitmap output for a graph.
-    pub fn process(&mut self)->RgbaImage{
+    pub fn process(&mut self)->GraphResult<RgbaImage>{
 
 
         let mut includes = true;
@@ -114,8 +123,9 @@ impl Graph{
             includes = false;
             for edge in self.get_edges_connnected_to(0){
                 if edge.0 == layer {
-                    let val = self.nodes.get_mut(&edge.1.outputNode).unwrap().get(edge.1.outputIndex).unwrap();
-                    self.nodes.get_mut(&edge.1.inputNode).unwrap().set(edge.1.inputIndex, val).unwrap();
+                    let val = match self.nodes.get_mut(&edge.1.outputNode){Some(val)=>val,None=> return Err(GraphError::NodeNotFound)}.get(edge.1.outputIndex)?;
+                    match self.nodes.get_mut(&edge.1.inputNode){Some(val)=>val,None=> return Err(GraphError::NodeNotFound)}.set(edge.1.inputIndex, val)?;
+                    
                     includes = true;
                 }
 
@@ -125,11 +135,11 @@ impl Graph{
 
 
         
-        if let node::NodeIOType::BitmapType(bitmap) =self.nodes.get_mut(&0).unwrap().get(0).unwrap(){
+        if let node::NodeIOType::BitmapType(bitmap) =self.nodes.get_mut(&0).unwrap().get(0)?{
             for (_key, value) in &mut self.nodes{
                 value.clear_buffers();
             }
-            bitmap
+            Ok(bitmap)
         }else{
             panic!();
         }
@@ -334,9 +344,9 @@ impl Graph{
         for cmd in &commands{
             println!("{}",cmd);
             match cmd.name.as_str(){
-                "removeEdge" => self.remove_edge_and_replace_with_default(&Edge {outputNode:cmd.args[0].parse().unwrap(),outputIndex:cmd.args[1].parse().unwrap(),inputNode:cmd.args[2].parse().unwrap(),inputIndex:cmd.args[3].parse().unwrap()}, true)?,
-                "addEdge" => self.add_edge(Edge {outputNode:cmd.args[0].parse().unwrap(),outputIndex:cmd.args[1].parse().unwrap(),inputNode:cmd.args[2].parse().unwrap(),inputIndex:cmd.args[3].parse().unwrap()})?,
-                "addNode" => 
+                "removeEdge" => {if cmd.args.len() < 4{return Err(GraphError::IllFormedCommand)} self.remove_edge_and_replace_with_default(&Edge {outputNode:cmd.args[0].parse()?,outputIndex:cmd.args[1].parse()?,inputNode:cmd.args[2].parse()?,inputIndex:cmd.args[3].parse()?}, true)?;},
+                "addEdge" => {if cmd.args.len() < 4{return Err(GraphError::IllFormedCommand)} self.add_edge(Edge {outputNode:cmd.args[0].parse()?,outputIndex:cmd.args[1].parse()?,inputNode:cmd.args[2].parse()?,inputIndex:cmd.args[3].parse()?})?},
+                "addNode" => {if cmd.args.len() < 1{return Err(GraphError::IllFormedCommand)}
                 if cmd.args[0] == node::imageInputNode::ImageInputNode::get_node_name_static() {
                     self.add_node(Box::new(node::imageInputNode::ImageInputNode::new(self.user.clone())));
                 }else if cmd.args[0] == node::colorToImageNode::ColorToImageNode::get_node_name_static(){
@@ -353,28 +363,29 @@ impl Graph{
                     self.add_node(Box::new(node::rotationNode::RotationNode::new()));
                 }else if cmd.args[0] == node::resizeNode::ResizeNode::get_node_name_static(){
                     self.add_node(Box::new(node::resizeNode::ResizeNode::new()));
-                }
-                "removeNode" => self.remove_node(cmd.args[0].parse().unwrap(),true)?,
+                }}
+                "removeNode" =>{if cmd.args.len() < 1{return Err(GraphError::IllFormedCommand)} self.remove_node(cmd.args[0].parse()?,true)?},
                 "moveNode" => (),
-                "modifyDefault" => {match self.nodes.get_mut(&cmd.args[0].parse().unwrap()){
+                "modifyDefault" => {if cmd.args.len() < 3{return Err(GraphError::IllFormedCommand)} match self.nodes.get_mut(&cmd.args[0].parse()?){
                     Some(node) => {
                         let nodeName = node.get_node_name();
                         if nodeName == node::floatLiteralNode::FloatLiteralNode::get_node_name_static(){
-                            self.nodes.insert(cmd.args[0].parse().unwrap(), Box::new(node::floatLiteralNode::FloatLiteralNode::new(match cmd.args[2].parse(){
+                            self.nodes.insert(cmd.args[0].parse()?, Box::new(node::floatLiteralNode::FloatLiteralNode::new(match cmd.args[2].parse(){
                                 Ok(parsed) => parsed,
                                 Err(_) => return Err(GraphError::IllFormedCommand)
                             })));
                         }
                         else if nodeName == node::intLiteralNode::IntLiteralNode::get_node_name_static(){
-                            self.nodes.insert(cmd.args[0].parse().unwrap(), Box::new(node::intLiteralNode::IntLiteralNode::new(match cmd.args[2].parse(){
+                            self.nodes.insert(cmd.args[0].parse()?, Box::new(node::intLiteralNode::IntLiteralNode::new(match cmd.args[2].parse(){
                                 Ok(parsed) => parsed,
                                 Err(_) => return Err(GraphError::IllFormedCommand)
                             })));
                         }
                         else if nodeName == node::stringLiteralNode::StringLiteralNode::get_node_name_static(){
-                            self.nodes.insert(cmd.args[0].parse().unwrap(), Box::new(node::stringLiteralNode::StringLiteralNode::new(cmd.args[2].clone())));
+                            self.nodes.insert(cmd.args[0].parse()?, Box::new(node::stringLiteralNode::StringLiteralNode::new(cmd.args[2].clone())));
                         }
                         else if nodeName == node::colorLiteralNode::ColorLiteralNode::get_node_name_static(){
+                            if cmd.args.len() < 7{return Err(GraphError::IllFormedCommand)}
                             let mut channels : [u8;4] = [0;4];
                             for i in 0..4 {
                                 channels[i] = match cmd.args[i+2].parse(){
@@ -382,7 +393,7 @@ impl Graph{
                                     Err(_) => return Err(GraphError::IllFormedCommand)
                                 }
                             } 
-                            self.nodes.insert(cmd.args[0].parse().unwrap(), Box::new(node::colorLiteralNode::ColorLiteralNode::new(image::Rgba(channels))));
+                            self.nodes.insert(cmd.args[0].parse()?, Box::new(node::colorLiteralNode::ColorLiteralNode::new(image::Rgba(channels))));
                         }
                     }
                     None => return Err(GraphError::NodeNotFound)

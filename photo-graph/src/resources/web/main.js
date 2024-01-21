@@ -17,9 +17,11 @@ function saveOnclick(){
 async function main(){
   
   await GraphNode.loadNodeTemplates();
-  document.getElementById("top").insertAdjacentHTML("beforeend",graphFile);
+  document.getElementById("graphName").innerHTML = graphFile;
   document.getElementById("saveButton").onclick = saveOnclick;
   document.getElementById("uploadImageButton").onclick = ()=>{ window.location.href = domainName+"upload_image.html";};
+  document.getElementById("selectGraphButton").onclick = ()=>{window.location.href = domainName+"graph_selector.html";};
+  document.getElementById("loginPage").href = domainName+"login.html";
 
 
   let canvas = document.getElementById("canvas");

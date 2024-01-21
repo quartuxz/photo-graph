@@ -88,9 +88,8 @@ impl Node for RotationNode{
             
             let halfWidth = self.rotating.width() as f64/2.0;
             let halfHeight = self.rotating.height() as f64/2.0;
-            for x in [0,self.rotating.width()]{
-                for y in [0,self.rotating.height()]{
-
+            for (x,y,pix) in self.rotating.enumerate_pixels(){
+                if pix.0[3] != 0{
                     let mut rotX = ((x as f64)-halfWidth)*self.angle.cos()-((y as f64)-halfHeight)*self.angle.sin();
                     let mut rotY = ((x as f64)-halfWidth)*self.angle.sin()+((y as f64)-halfHeight)*self.angle.cos();
                     rotX += halfWidth;

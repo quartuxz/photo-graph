@@ -332,7 +332,7 @@ async fn process_graph(request: HttpRequest, data: web::Data<AppState>)-> impl R
     if !corroborate_claim(graph, &request).await{
         return HttpResponse::Unauthorized().into();
     }
-    let outputImage = graph.process();
+    let outputImage = match graph.process(){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()};
     let mut bytes: Vec<u8> = Vec::new();
     outputImage.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png).unwrap();
     HttpResponse::Ok().content_type("image/png").body(bytes)
@@ -365,7 +365,8 @@ async fn command_graph(request: HttpRequest, data: web::Data<AppState>, commands
             graph::GraphError::NodeNotFound => "node not found",
             graph::GraphError::MismatchedNodes => "mismatched sockets",
             graph::GraphError::UnknownCommand => "unknown command",
-            graph::GraphError::IllFormedCommand => "ill-formed command"
+            graph::GraphError::IllFormedCommand => "ill-formed command",
+            graph::GraphError::NError(_) => "node error"
              },
         None => "ok"
     })

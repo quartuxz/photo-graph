@@ -93,7 +93,7 @@ pub struct NodeDescriptor{
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum NodeIOType{
     IntType(i64),
     FloatType(f64),
@@ -130,7 +130,7 @@ impl fmt::Debug for NodeIOType{
 }
 
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum NodeError{
     #[error("The node '{0}' does not implement input for '{1}' at position '{2}'.")]
     InvalidInput(String,NodeIOType, u16),
