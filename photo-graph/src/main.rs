@@ -441,7 +441,12 @@ async fn sites(_req: HttpRequest, info: web::Path<Info>) -> impl Responder {
     if cleanName.split(".").last() == Some("png"){
         return HttpResponse::Ok().content_type("image/png").body(match std::fs::read(util::RESOURCE_PATH.clone()+r"web/" + &cleanName){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()});
     }
+    let mut contentType = "text/html";
+    if cleanName.split(".").last() == Some("css"){
+        contentType = "text/css";
+    }
     HttpResponse::Ok()
+    .content_type(contentType)
     .body(match std::fs::read_to_string(util::RESOURCE_PATH.clone()+"web/" + &cleanName){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()})
 }
 
