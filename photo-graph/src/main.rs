@@ -7,6 +7,7 @@ extern crate lazy_static;
 use std::fs::File;
 
 use std::io::Cursor;
+use std::path::PathBuf;
 use std::{env, thread};
 use std::{fs, collections::HashMap,io::Write};
 use std::sync::Mutex;
@@ -436,10 +437,8 @@ async fn sites(_req: HttpRequest, info: web::Path<Info>) -> impl Responder {
 
     let name = info.name.clone();
     let cleanName = util::sanitize(&name, false);
-    println!("{}",cleanName);
-    println!("{}",match std::fs::read_to_string(util::RESOURCE_PATH.clone()+"web/" + &cleanName){Ok(_val)=>"".to_owned(),Err(_)=>"error, file not found!".to_owned()});
     if cleanName.split(".").last() == Some("png"){
-        return HttpResponse::Ok().content_type("image/png").body(match std::fs::read(util::RESOURCE_PATH.clone()+r"web/" + &cleanName){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()});
+        return HttpResponse::Ok().content_type("image/png").body(match std::fs::read(PathBuf::from_iter([util::RESOURCE_PATH.clone(),"web".to_string() ,cleanName.clone()])){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()});
     }
     let mut contentType = "text/html";
     if cleanName.split(".").last() == Some("css"){
@@ -447,7 +446,7 @@ async fn sites(_req: HttpRequest, info: web::Path<Info>) -> impl Responder {
     }
     HttpResponse::Ok()
     .content_type(contentType)
-    .body(match std::fs::read_to_string(util::RESOURCE_PATH.clone()+"web/" + &cleanName){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()})
+    .body(match std::fs::read_to_string(PathBuf::from_iter([util::RESOURCE_PATH.clone(),"web".to_string() ,cleanName.clone()])){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()})
 }
 
 #[actix_web::main]

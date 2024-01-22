@@ -171,7 +171,6 @@ class UI{
     context;
     contextMenu;
     background = new Image();
-    receivedImage = new Image();
     loadingImage = new Image();
   
     constructor(graph, canvas,context){
@@ -193,10 +192,7 @@ class UI{
       this.canvas.addEventListener('dblclick',this.dblClick.bind(this), false);
       this.canvas.addEventListener('keydown',this.keydown.bind(this), false);
       this.process();
-      let draw= this.draw.bind(this);
-      this.receivedImage.onload = ()=>{
-        this.draw();
-      }
+
       this.draw();
     }
   
@@ -240,8 +236,13 @@ class UI{
       if(response.status==401){window.location.href = "login";}
       let blobResponse = await response.blob();
       let url =window.URL.createObjectURL(blobResponse);
-      this.background = this.receivedImage;
+      this.background = new Image();
+
       this.background.src=url;
+      this.background.onload = ()=>{
+        this.draw();
+      }
+      
       document.getElementById("downloadButton").href=url;
     }
 
@@ -308,7 +309,6 @@ class UI{
             let manipulatedLine = this.graph.getLineByInput(this.selecting.node.id,this.selecting.IOSocket);
             if(manipulatedLine != null){
               this.graph.removeLine(manipulatedLine);
-              this.draw();
               this.process();
               this.selecting = new UIElement();
               this.selecting.type = "output";
