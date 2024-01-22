@@ -17,10 +17,10 @@ impl ImageInputNode{
             finalFile="dummy.png".to_owned();
         }
         if finalFile != "dummy.png"{
-            finalFile = crate::util::sanitize(&self.username,true) + r"\" + finalFile.as_str();
-            self.buffer = match image::open(crate::util::RESOURCE_PATH.clone()+r"\images\"+ finalFile.as_str()){Ok(val)=>val,Err(_)=>return Err(NodeError::IOError(Self::get_node_name_static()))}.into_rgba8();
+            finalFile = crate::util::sanitize(&self.username,true) + finalFile.as_str();
+            self.buffer = match image::open(crate::util::RESOURCE_PATH.clone()+"/images/"+ finalFile.as_str()){Ok(val)=>val,Err(_)=>return Err(NodeError::IOError(Self::get_node_name_static()))}.into_rgba8();
         }else{
-            self.buffer = match image::open(crate::util::RESOURCE_PATH.clone()+r"\web\"+ finalFile.as_str()){Ok(val)=>val,Err(_)=>return Err(NodeError::IOError(Self::get_node_name_static()))}.into_rgba8();
+            self.buffer = match image::open(crate::util::RESOURCE_PATH.clone()+"/web/"+ finalFile.as_str()){Ok(val)=>val,Err(_)=>return Err(NodeError::IOError(Self::get_node_name_static()))}.into_rgba8();
         }
 
         Ok(())
