@@ -111,7 +111,7 @@ class ContextMenu{
     }
   }
 
-  async onSubmitManipulate(){
+  onSubmitManipulate(){
     for(const inode of this.selected.template.inputNodes){
       if(this.nodeProperties.get(inode.name).hasConnection || inode.IOType == "bitmap"){
         continue;
@@ -131,7 +131,7 @@ class ContextMenu{
     }
   }
 
-  async onSubmitCreate(){
+  onSubmitCreate(){
       for(const [key,template] of GraphNode.nodeTemplates){
         if(document.getElementById(template.name).checked){
           this.ui.graph.addNamedNode(template.name, this.position);
@@ -312,8 +312,8 @@ class UI{
               this.selecting.node = this.graph.getNode(manipulatedLine.fromID);
               this.selecting.IOSocket = manipulatedLine.fromSocket;
             }
-    
-            
+
+            this.draw();
           }
         
         }
@@ -323,7 +323,7 @@ class UI{
         this.isRightMouseDown = true;
   
       }
-      
+
       
     }
   

@@ -316,7 +316,7 @@ class NodeIO{
       }
     }
 
-    removeLine(lin,callback){
+    removeLine(line,callback){
       this.#registerCommands([new Command("removeEdge",line.commandForm())],callback);
       this.#_removeLine(line);
     }
