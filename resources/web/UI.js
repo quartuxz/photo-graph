@@ -416,9 +416,9 @@ class UI{
               this.context.stroke();
               this.context.restore();}
 
-  
+              this.drawLine();
           }
-          this.drawLine();
+
         }
       }
   
