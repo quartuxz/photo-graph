@@ -396,10 +396,14 @@ class NodeIO{
       this.#lines.push(line);
     }
 
-    async addLine(line, callback){
-      if(await this.#registerCommands([new Command("addEdge",line.commandForm())],callback)){
-        this.#_addLine(line);
-      }
+    addLine(line, callback){
+      this.#_addLine(line);
+      let inner = async () => {
+        if(!await this.#registerCommands([new Command("addEdge",line.commandForm())],callback)){
+        this.#_removeLine(line);
+      }};
+      inner();
+      
     }
     
     async #registerCommands(commands, callback){

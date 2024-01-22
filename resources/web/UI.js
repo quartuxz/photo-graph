@@ -171,6 +171,7 @@ class UI{
     contextMenu;
     background = new Image();
     loadingImage = new Image();
+    drawLine = null;
   
     constructor(graph, canvas,context){
       this.loadingImage.src = "loading.png";
@@ -281,7 +282,11 @@ class UI{
       }
 
       this.context.restore();
-  
+      
+      if(this.drawLine!=null){
+        this.drawLine();
+        this.drawLine = null;
+      }
   
       this.graph.draw(this.context);
       this.contextMenu.draw();
@@ -400,17 +405,20 @@ class UI{
             }else{
               from = this.selecting.node.getObjectTransformed().inputCircles[this.selecting.IOSocket].center;
             }
-            let to = this.graph.getTransformedPos(mousePos);
-            this.context.save();
-            this.context.beginPath();
-            this.context.moveTo(from.x,from.y);
-            this.context.lineTo(to.x,to.y);
-            this.context.strokeStyle= 'cyan';
-            this.context.lineWidth = 4;
-            this.context.stroke();
-            this.context.restore();
+            this.drawLine = () => {            
+              let to = this.graph.getTransformedPos(mousePos);
+              this.context.save();
+              this.context.beginPath();
+              this.context.moveTo(from.x,from.y);
+              this.context.lineTo(to.x,to.y);
+              this.context.strokeStyle= 'cyan';
+              this.context.lineWidth = 4;
+              this.context.stroke();
+              this.context.restore();}
+
   
           }
+          this.drawLine();
         }
       }
   
