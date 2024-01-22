@@ -92,7 +92,7 @@ class ContextMenu{
       contents += "<button id=\"deleteButton\">delete</button>";
       document.getElementById("contextInner").innerHTML = contents;
       document.getElementById("manipulateForm").onsubmit = () => {this.onSubmitManipulate(); return false;};
-      document.getElementById("deleteButton").onclick = () =>{this.ui.changeContextMenu("default",null); this.ui.graph.removeNode(this.selected.id,this.ui.process.bind(ui))};
+      document.getElementById("deleteButton").onclick = () =>{this.ui.changeContextMenu("default",null); this.ui.graph.removeNode(this.selected.id,this.ui.process.bind(this.ui))};
 
 
     }else if(type=="create"){
@@ -119,13 +119,13 @@ class ContextMenu{
       else if(inode.IOType == "color"){
         let color = hexadecimalToRGB(document.getElementById(inode.name).value);
         color.push(parseInt(document.getElementById("alpha").value));
-        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,color,this.ui.process.bind(ui));
+        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,color,this.ui.process.bind(this.ui));
       }else if(inode.presetValues != null){
         let val = document.getElementById(inode.name).value;
-        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[Number(val)],this.ui.process.bind(ui));
+        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[Number(val)],this.ui.process.bind(this.ui));
         
       }else{
-        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[document.getElementById(inode.name).value],this.ui.process.bind(ui));
+        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[document.getElementById(inode.name).value],this.ui.process.bind(this.ui));
       }
 
     }
