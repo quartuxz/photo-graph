@@ -423,8 +423,7 @@ class NodeIO{
             await callback(final=="ok");
           }
           if(this.#commandRequestQueue.length > 0){
-            await this.#commandRequestQueue[0]();
-            this.#commandRequestQueue.shift();
+            this.#commandRequestQueue.shift()();
           }
           
       }
