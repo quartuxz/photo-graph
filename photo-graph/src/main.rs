@@ -385,6 +385,7 @@ async fn retrieve_node_templates()->impl Responder{
     descriptors.push(graph::node::moveNode::MoveNode::get_node_descriptor());
     descriptors.push(graph::node::rotationNode::RotationNode::get_node_descriptor());
     descriptors.push(graph::node::resizeNode::ResizeNode::get_node_descriptor());
+    descriptors.push(graph::node::scaleNode::ScaleNode::get_node_descriptor());
     HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&descriptors).unwrap())
 }
 
@@ -490,7 +491,7 @@ async fn main() -> std::io::Result<()> {
             .service(command_graph)
             .service(upload_image)
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("0.0.0.0", 8088))?
     .run()
     .await
 }

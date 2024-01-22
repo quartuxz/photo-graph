@@ -12,6 +12,7 @@ pub mod composeNode;
 pub mod blendNode;
 pub mod moveNode;
 pub mod resizeNode;
+pub mod scaleNode;
 
 use std::{vec, result, fmt};
 use serde::{Serialize, Serializer, ser::SerializeStruct};

@@ -347,23 +347,26 @@ impl Graph{
                 "removeEdge" => {if cmd.args.len() < 4{return Err(GraphError::IllFormedCommand)} self.remove_edge_and_replace_with_default(&Edge {outputNode:cmd.args[0].parse()?,outputIndex:cmd.args[1].parse()?,inputNode:cmd.args[2].parse()?,inputIndex:cmd.args[3].parse()?}, true)?;},
                 "addEdge" => {if cmd.args.len() < 4{return Err(GraphError::IllFormedCommand)} self.add_edge(Edge {outputNode:cmd.args[0].parse()?,outputIndex:cmd.args[1].parse()?,inputNode:cmd.args[2].parse()?,inputIndex:cmd.args[3].parse()?})?},
                 "addNode" => {if cmd.args.len() < 1{return Err(GraphError::IllFormedCommand)}
-                if cmd.args[0] == node::imageInputNode::ImageInputNode::get_node_name_static() {
-                    self.add_node(Box::new(node::imageInputNode::ImageInputNode::new(self.user.clone())));
-                }else if cmd.args[0] == node::colorToImageNode::ColorToImageNode::get_node_name_static(){
-                    self.add_node(Box::new(node::colorToImageNode::ColorToImageNode::new()));
-                }else if cmd.args[0] == node::mathNode::MathNode::get_node_name_static(){
-                    self.add_node(Box::new(node::mathNode::MathNode::new()));
-                }else if cmd.args[0] == node::composeNode::ComposeNode::get_node_name_static(){
-                    self.add_node(Box::new(node::composeNode::ComposeNode::new()));
-                }else if cmd.args[0] == node::blendNode::BlendNode::get_node_name_static(){
-                    self.add_node(Box::new(node::blendNode::BlendNode::new()));
-                }else if cmd.args[0] == node::moveNode::MoveNode::get_node_name_static(){
-                    self.add_node(Box::new(node::moveNode::MoveNode::new()));
-                }else if cmd.args[0] == node::rotationNode::RotationNode::get_node_name_static(){
-                    self.add_node(Box::new(node::rotationNode::RotationNode::new()));
-                }else if cmd.args[0] == node::resizeNode::ResizeNode::get_node_name_static(){
-                    self.add_node(Box::new(node::resizeNode::ResizeNode::new()));
-                }}
+                    if cmd.args[0] == node::imageInputNode::ImageInputNode::get_node_name_static() {
+                        self.add_node(Box::new(node::imageInputNode::ImageInputNode::new(self.user.clone())));
+                    }else if cmd.args[0] == node::colorToImageNode::ColorToImageNode::get_node_name_static(){
+                        self.add_node(Box::new(node::colorToImageNode::ColorToImageNode::new()));
+                    }else if cmd.args[0] == node::mathNode::MathNode::get_node_name_static(){
+                        self.add_node(Box::new(node::mathNode::MathNode::new()));
+                    }else if cmd.args[0] == node::composeNode::ComposeNode::get_node_name_static(){
+                        self.add_node(Box::new(node::composeNode::ComposeNode::new()));
+                    }else if cmd.args[0] == node::blendNode::BlendNode::get_node_name_static(){
+                        self.add_node(Box::new(node::blendNode::BlendNode::new()));
+                    }else if cmd.args[0] == node::moveNode::MoveNode::get_node_name_static(){
+                        self.add_node(Box::new(node::moveNode::MoveNode::new()));
+                    }else if cmd.args[0] == node::rotationNode::RotationNode::get_node_name_static(){
+                        self.add_node(Box::new(node::rotationNode::RotationNode::new()));
+                    }else if cmd.args[0] == node::resizeNode::ResizeNode::get_node_name_static(){
+                        self.add_node(Box::new(node::resizeNode::ResizeNode::new()));
+                    }else if cmd.args[0] == node::scaleNode::ScaleNode::get_node_name_static(){
+                        self.add_node(Box::new(node::scaleNode::ScaleNode::new()));
+                    }
+                    }
                 "removeNode" =>{if cmd.args.len() < 1{return Err(GraphError::IllFormedCommand)} self.remove_node(cmd.args[0].parse()?,true)?},
                 "moveNode" => (),
                 "modifyDefault" => {if cmd.args.len() < 3{return Err(GraphError::IllFormedCommand)} match self.nodes.get_mut(&cmd.args[0].parse()?){
