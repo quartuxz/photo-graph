@@ -292,6 +292,7 @@ class NodeIO{
     #lines = [];
     #currentID = 0;
     #context;
+    #commandRequestQueue = [];
   
     constructor(context,graphID){
 
@@ -317,7 +318,7 @@ class NodeIO{
     }
 
     removeLine(line,callback){
-      this.#registerCommands([new Command("removeEdge",line.commandForm())],callback);
+      this.#registerCommands([new Command("removeEdge",line.commandForm())],(_)=>{callback();});
       this.#_removeLine(line);
     }
 
@@ -365,7 +366,7 @@ class NodeIO{
     }
 
     removeNode(id,callback){
-      this.#registerCommands([new Command("removeNode",[id.toString()])],callback);
+      this.#registerCommands([new Command("removeNode",[id.toString()])],(_)=>{callback();});
       this.#_removeNode(id);
     }
 
@@ -383,7 +384,7 @@ class NodeIO{
       for(const parameter of parameters){
         args.push(parameter.toString());
       }
-      this.#registerCommands([new Command("modifyDefault",args)],callback);
+      this.#registerCommands([new Command("modifyDefault",args)],(_)=>{callback();});
       this.#_modifyDefault(node, nodeID,parameters);
     }
 
@@ -399,36 +400,39 @@ class NodeIO{
     addLine(line, callback){
       this.#_addLine(line);
       let inner = async () => {
-        if(!await this.#registerCommands([new Command("addEdge",line.commandForm())],callback)){
-        this.#_removeLine(line);
-      }};
+        this.#registerCommands([new Command("addEdge",line.commandForm())],(succesful)=>{callback(); if(!succesful){this.#_removeLine(line);}});
+      };
       inner();
       
     }
-    
-    async #registerCommands(commands, callback){
-        //commands are sent to be executed server-side
-        let body = {commands:commands};
-        const options = {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body)
-        };
-        let response = await fetch("/command", options);
-        if(response.status==401){window.location.href = "login";}
-        let final = await response.text();
-        if(callback != null){
-          await callback();
-        }
-
-        if(final != "ok"){
-
-          return false;
-        }
-        
-        return true;
+    //commands are sent to be executed server-side
+    #registerCommands(commands, callback){
+        let inner = async ()=> {
+          let body = {commands:commands};
+          const options = {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body)
+          };
+          let response = await fetch("/command", options);
+          if(response.status==401){window.location.href = "login";}
+          let final = await response.text();
+          if(callback != null){
+            await callback(final=="ok");
+          }
+          if(this.#commandRequestQueue.length > 0){
+            await this.#commandRequestQueue[0]();
+            this.#commandRequestQueue.shift();
+          }
+          
+      }
+      if(this.#commandRequestQueue.length == 0){
+        inner();
+      }else{
+        this.#commandRequestQueue.push(inner);
+      }
     }
 
     interpretCommands(commands){
