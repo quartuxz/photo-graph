@@ -171,8 +171,12 @@ class UI{
     context;
     contextMenu;
     background = new Image();
+    receivedImage = new Image();
+    loadingImage = new Image();
   
     constructor(graph, canvas,context){
+      this.loadingImage.src = "loading.png";
+
       this.contextMenu = new ContextMenu("default",null,this);
 
       this.graph = graph;
@@ -190,7 +194,7 @@ class UI{
       this.canvas.addEventListener('keydown',this.keydown.bind(this), false);
       this.process();
       let draw= this.draw.bind(this);
-      this.background.onload = ()=>{
+      this.receivedImage.onload = ()=>{
         this.draw();
       }
       this.draw();
@@ -224,7 +228,8 @@ class UI{
     }
 
     async process(){
-      this.background.src = "loading.png";
+      this.background = this.loadingImage;
+      this.draw();
       const options = {
         method: "POST",
         headers: {
@@ -235,6 +240,7 @@ class UI{
       if(response.status==401){window.location.href = "login";}
       let blobResponse = await response.blob();
       let url =window.URL.createObjectURL(blobResponse);
+      this.background = this.receivedImage;
       this.background.src=url;
       document.getElementById("downloadButton").href=url;
     }
