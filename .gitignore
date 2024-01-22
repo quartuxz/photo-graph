@@ -1,4 +1,5 @@
 /target
-
-photo-graph/src/resources/images/**
+.env
+secret.txt
+resources/images/**
 sqlite.*

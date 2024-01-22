@@ -7,7 +7,7 @@ async function onsubmitCreateForm(){
         method: "POST",
     };
     let response = await fetch("/createGraph", options);
-    if(response.status==401){window.location.href = domainName+"login.html";}
+    if(response.status==401){window.location.href = "login.html";}
     
     const options2 = {
         method: "POST",
@@ -17,11 +17,11 @@ async function onsubmitCreateForm(){
         body: JSON.stringify({fileName:graphFile})
     };
     let response2 = await fetch("/saveGraph", options2);
-    if(response2.status==401){window.location.href = domainName+"login.html";}
+    if(response2.status==401){window.location.href = "login.html";}
     
     setCookie("graphFile",graphFile,9999);
 
-    window.location.href = domainName+"main.html";
+    window.location.href = "main.html";
 
 }
 
@@ -47,9 +47,9 @@ function onsubmitLoadForm(){
                     body: graphFile
                 };
                 let response = await fetch("/loadGraph", options);
-                if(response.status==401){window.location.href = domainName+"login.html";}
+                if(response.status==401){window.location.href = "login.html";}
                 setCookie("graphFile",graphFile,9999);
-                window.location.href = domainName+"main.html";
+                window.location.href = "main.html";
             }
         }
     };
@@ -63,7 +63,7 @@ async function mainMenu(){
     };
     let response = await fetch("/retrieveGraphFileList", options);
     //credentials are no longer valid
-    if(response.status==401){window.location.href = domainName+"login";}
+    if(response.status==401){window.location.href = "login";}
     graphFiles = await response.json();
     let contents= "<form id=\"loadForm\" name=\"loadForm\">";
     for(const graphFile of graphFiles){

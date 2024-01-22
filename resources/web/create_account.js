@@ -19,7 +19,7 @@ async function createFormSubmit(){
     let final = await response.text();
     if(final=="ok"){
         document.getElementById("contextInner").innerHTML = initialHtml;
-        window.location.href = domainName+"login.html";
+        window.location.href = "login.html";
     }else{
         if(!incorrectCredsOnce){
             document.getElementById("contextInner").insertAdjacentHTML("afterbegin", "USERNAME ALREADY TAKEN OR NOT ALLOWED!");

@@ -413,7 +413,7 @@ class NodeIO{
           body: JSON.stringify(body)
         };
         let response = await fetch("/command", options);
-        if(response.status==401){window.location.href = domainName+"login";}
+        if(response.status==401){window.location.href = "login";}
         let final = await response.text();
         if(final != "ok"){
 

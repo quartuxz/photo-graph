@@ -4,7 +4,7 @@ let incorrectCredsOnce =  false;
 let initialHtml = document.getElementById("contextInner").innerHTML;
 
 
-document.getElementById("createLink").href = domainName+"create_account.html";
+document.getElementById("createLink").href = "create_account.html";
 
 async function loginFormSubmit(){
     let username = document.getElementById("username").value;
@@ -21,7 +21,7 @@ async function loginFormSubmit(){
     let response = await fetch("/login", options);
     if(response.ok){
         document.getElementById("contextInner").innerHTML = initialHtml;
-        window.location.href = domainName+"graph_selector.html";
+        window.location.href = "graph_selector.html";
     }else{
         if(!incorrectCredsOnce){
             document.getElementById("contextInner").insertAdjacentHTML("afterbegin", "USERNAME OR PASSWORD NOT CORRECT!");

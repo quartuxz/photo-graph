@@ -232,7 +232,7 @@ class UI{
         }
       };
       let response = await fetch("/process",options);
-      if(response.status==401){window.location.href = domainName+"login";}
+      if(response.status==401){window.location.href = "login";}
       let blobResponse = await response.blob();
       let url =window.URL.createObjectURL(blobResponse);
       this.background.src=url;
