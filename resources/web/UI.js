@@ -225,7 +225,7 @@ class UI{
 
     async process(){
       this.background = this.loadingImage;
-      this.draw();
+      this.draw(1);
       const options = {
         method: "POST",
         headers: {
@@ -239,7 +239,7 @@ class UI{
       this.background = new Image();
       this.background.src=url;
       this.background.onload = ()=>{
-        this.draw(true);
+        this.draw(2);
       }
       
       document.getElementById("downloadButton").href=url;
@@ -269,7 +269,7 @@ class UI{
       this.draw();
     }
   
-    draw(isProcessCall = false){
+    draw(processCall = 0){
       this.context.save();
       this.context.setTransform(1,0,0,1,0,0);
       this.context.clearRect(0,0,this.canvas.width,this.canvas.height);
@@ -282,10 +282,10 @@ class UI{
       }
 
       this.context.restore();
-      if(!isProcessCall){
-        this.drawLine = null;
+      if(this.drawLine!=null && processCall == 1){
+        this.drawLine();
       }
-      if(this.drawLine!=null){
+      if(this.drawLine!=null && processCall == 2){
         this.drawLine();
         this.drawLine = null;
       }
