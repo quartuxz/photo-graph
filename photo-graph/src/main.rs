@@ -7,7 +7,7 @@ extern crate lazy_static;
 use std::fs::File;
 
 use std::io::Cursor;
-use std::thread;
+use std::{env, thread};
 use std::{fs, collections::HashMap,io::Write};
 use std::sync::Mutex;
 
@@ -438,6 +438,12 @@ async fn sites(_req: HttpRequest, info: web::Path<Info>) -> impl Responder {
     let cleanName = util::sanitize(&name, false);
     println!("{}",cleanName);
     println!("{}",match std::fs::read_to_string(util::RESOURCE_PATH.clone()+r"web\" + &cleanName){Ok(val)=>val,Err(_)=>"error, file not found!".to_owned()});
+    println!("{}",env::current_dir().unwrap().display());
+    let paths = fs::read_dir("./").unwrap();
+
+    for path in paths {
+        println!("files in current directory: {}", path.unwrap().path().display())
+    }
     if cleanName.split(".").last() == Some("png"){
         return HttpResponse::Ok().content_type("image/png").body(match std::fs::read(util::RESOURCE_PATH.clone()+r"web\" + &cleanName){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()});
     }
