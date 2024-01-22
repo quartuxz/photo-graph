@@ -436,6 +436,8 @@ async fn sites(_req: HttpRequest, info: web::Path<Info>) -> impl Responder {
 
     let name = info.name.clone();
     let cleanName = util::sanitize(&name, false);
+    println!("{}",cleanName);
+    println!("{}",match std::fs::read_to_string(util::RESOURCE_PATH.clone()+r"web\" + &cleanName){Ok(val)=>val,Err(_)=>"error, file not found!".to_owned()});
     if cleanName.split(".").last() == Some("png"){
         return HttpResponse::Ok().content_type("image/png").body(match std::fs::read(util::RESOURCE_PATH.clone()+r"web\" + &cleanName){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()});
     }
