@@ -316,8 +316,8 @@ class NodeIO{
       }
     }
 
-    async removeLine(line){
-      await this.#registerCommands([new Command("removeEdge",line.commandForm())]);
+    removeLine(lin,callback){
+      this.#registerCommands([new Command("removeEdge",line.commandForm())],callback);
       this.#_removeLine(line);
     }
 
@@ -336,7 +336,7 @@ class NodeIO{
     }
   
     async addNamedNode(nodeName,position){
-      await this.#registerCommands([new Command("addNode", [nodeName,position.x.toString(),position.y.toString()])]);
+      this.#registerCommands([new Command("addNode", [nodeName,position.x.toString(),position.y.toString()])],null);
 
       this.#_addNode(new GraphNode(nodeName,position,this.#context));
     }
@@ -364,8 +364,8 @@ class NodeIO{
       }
     }
 
-    async removeNode(id){
-      await this.#registerCommands([new Command("removeNode",[id.toString()])]);
+    removeNode(id,callback){
+      this.#registerCommands([new Command("removeNode",[id.toString()])],callback);
       this.#_removeNode(id);
     }
 
@@ -378,12 +378,12 @@ class NodeIO{
       }
     }
     //the node whose default value is being modified, the nodeID of the default value and the parameters being changed(could be a number a string or a 4-value array for color)
-    async modifyDefault(node, nodeID,parameters){
+    modifyDefault(node, nodeID,parameters,callback){
       let args = [nodeID.toString(),node.id.toString()];
       for(const parameter of parameters){
         args.push(parameter.toString());
       }
-      await this.#registerCommands([new Command("modifyDefault",args)]);
+      this.#registerCommands([new Command("modifyDefault",args)],callback);
       this.#_modifyDefault(node, nodeID,parameters);
     }
 
@@ -396,13 +396,13 @@ class NodeIO{
       this.#lines.push(line);
     }
 
-    async addLine(line){
-      if(await this.#registerCommands([new Command("addEdge",line.commandForm())])){
+    async addLine(line, callback){
+      if(await this.#registerCommands([new Command("addEdge",line.commandForm())],callback)){
         this.#_addLine(line);
       }
     }
     
-    async #registerCommands(commands){
+    async #registerCommands(commands, callback){
         //commands are sent to be executed server-side
         let body = {commands:commands};
         const options = {
@@ -415,10 +415,15 @@ class NodeIO{
         let response = await fetch("/command", options);
         if(response.status==401){window.location.href = "login";}
         let final = await response.text();
+        if(callback != null){
+          await callback();
+        }
+
         if(final != "ok"){
 
           return false;
         }
+        
         return true;
     }
 

@@ -92,7 +92,7 @@ class ContextMenu{
       contents += "<button id=\"deleteButton\">delete</button>";
       document.getElementById("contextInner").innerHTML = contents;
       document.getElementById("manipulateForm").onsubmit = () => {this.onSubmitManipulate(); return false;};
-      document.getElementById("deleteButton").onclick = async () =>{this.ui.changeContextMenu("default",null); await this.ui.graph.removeNode(this.selected.id); this.ui.process()};
+      document.getElementById("deleteButton").onclick = () =>{this.ui.changeContextMenu("default",null); this.ui.graph.removeNode(this.selected.id,this.ui.process.bind(ui))};
 
 
     }else if(type=="create"){
@@ -119,23 +119,22 @@ class ContextMenu{
       else if(inode.IOType == "color"){
         let color = hexadecimalToRGB(document.getElementById(inode.name).value);
         color.push(parseInt(document.getElementById("alpha").value));
-        await this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,color);
+        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,color,this.ui.process.bind(ui));
       }else if(inode.presetValues != null){
         let val = document.getElementById(inode.name).value;
-        await this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[Number(val)]);
+        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[Number(val)],this.ui.process.bind(ui));
         
       }else{
-        await this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[document.getElementById(inode.name).value]);
+        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[document.getElementById(inode.name).value],this.ui.process.bind(ui));
       }
 
     }
-    this.ui.process();
   }
 
   async onSubmitCreate(){
       for(const [key,template] of GraphNode.nodeTemplates){
         if(document.getElementById(template.name).checked){
-          await this.ui.graph.addNamedNode(template.name, this.position);
+          this.ui.graph.addNamedNode(template.name, this.position);
         }
       }
       this.ui.draw();
@@ -307,8 +306,7 @@ class UI{
             this.changeContextMenu("default",null);
             let manipulatedLine = this.graph.getLineByInput(this.selecting.node.id,this.selecting.IOSocket);
             if(manipulatedLine != null){
-              await this.graph.removeLine(manipulatedLine);
-              this.process();
+              this.graph.removeLine(manipulatedLine, this.process.bind(this));
               this.selecting = new UIElement();
               this.selecting.type = "output";
               this.selecting.node = this.graph.getNode(manipulatedLine.fromID);
@@ -344,11 +342,10 @@ class UI{
               }
               if(pointed.type == type2 && pointed.node.id != this.selecting.node.id){
                 if(type1 == "output"){
-                  await this.graph.addLine(new Line(this.selecting.node.id,this.selecting.IOSocket,pointed.node.id,pointed.IOSocket));
+                  this.graph.addLine(new Line(this.selecting.node.id,this.selecting.IOSocket,pointed.node.id,pointed.IOSocket), this.process.bind(this));
                 }else{
-                  await this.graph.addLine(new Line(pointed.node.id,pointed.IOSocket,this.selecting.node.id,this.selecting.IOSocket));
+                  this.graph.addLine(new Line(pointed.node.id,pointed.IOSocket,this.selecting.node.id,this.selecting.IOSocket), this.process.bind(this));
                 }
-                this.process();
               }
   
   
@@ -461,10 +458,10 @@ class UI{
       this.draw();
     }
 
-    async keydown(evt){
+    keydown(evt){
       let code = evt.keyCode;
       switch(code){
-        case 88: if(this.selecting != null && this.selecting.node.id != 0){this.changeContextMenu("default",null); await this.graph.removeNode(this.selecting.node.id); this.process()};
+        case 88: if(this.selecting != null && this.selecting.node.id != 0){this.changeContextMenu("default",null); this.graph.removeNode(this.selecting.node.id,this.process.bind(this))};
         default: ;
       }
     }
