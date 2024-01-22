@@ -239,7 +239,7 @@ class UI{
       this.background = new Image();
       this.background.src=url;
       this.background.onload = ()=>{
-        this.draw();
+        this.draw(true);
       }
       
       document.getElementById("downloadButton").href=url;
@@ -269,7 +269,7 @@ class UI{
       this.draw();
     }
   
-    draw(){
+    draw(isProcessCall = false){
       this.context.save();
       this.context.setTransform(1,0,0,1,0,0);
       this.context.clearRect(0,0,this.canvas.width,this.canvas.height);
@@ -282,7 +282,9 @@ class UI{
       }
 
       this.context.restore();
-      
+      if(!isProcessCall){
+        this.drawLine = null;
+      }
       if(this.drawLine!=null){
         this.drawLine();
         this.drawLine = null;
