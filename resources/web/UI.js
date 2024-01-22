@@ -92,7 +92,7 @@ class ContextMenu{
       contents += "<button id=\"deleteButton\">delete</button>";
       document.getElementById("contextInner").innerHTML = contents;
       document.getElementById("manipulateForm").onsubmit = () => {this.onSubmitManipulate(); return false;};
-      document.getElementById("deleteButton").onclick = () =>{this.ui.changeContextMenu("default",null); this.ui.graph.removeNode(this.selected.id); this.ui.process()};
+      document.getElementById("deleteButton").onclick = async () =>{this.ui.changeContextMenu("default",null); await this.ui.graph.removeNode(this.selected.id); this.ui.process()};
 
 
     }else if(type=="create"){
@@ -111,7 +111,7 @@ class ContextMenu{
     }
   }
 
-  onSubmitManipulate(){
+  async onSubmitManipulate(){
     for(const inode of this.selected.template.inputNodes){
       if(this.nodeProperties.get(inode.name).hasConnection || inode.IOType == "bitmap"){
         continue;
@@ -119,23 +119,23 @@ class ContextMenu{
       else if(inode.IOType == "color"){
         let color = hexadecimalToRGB(document.getElementById(inode.name).value);
         color.push(parseInt(document.getElementById("alpha").value));
-        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,color);
+        await this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,color);
       }else if(inode.presetValues != null){
         let val = document.getElementById(inode.name).value;
-        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[Number(val)]);
+        await this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[Number(val)]);
         
       }else{
-        this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[document.getElementById(inode.name).value]);
+        await this.ui.graph.modifyDefault(this.selected,this.nodeProperties.get(inode.name).id,[document.getElementById(inode.name).value]);
       }
 
     }
     this.ui.process();
   }
 
-  onSubmitCreate(){
+  async onSubmitCreate(){
       for(const [key,template] of GraphNode.nodeTemplates){
         if(document.getElementById(template.name).checked){
-          this.ui.graph.addNamedNode(template.name, this.position);
+          await this.ui.graph.addNamedNode(template.name, this.position);
         }
       }
       this.ui.draw();
@@ -237,7 +237,6 @@ class UI{
       let blobResponse = await response.blob();
       let url =window.URL.createObjectURL(blobResponse);
       this.background = new Image();
-
       this.background.src=url;
       this.background.onload = ()=>{
         this.draw();
@@ -308,7 +307,7 @@ class UI{
             this.changeContextMenu("default",null);
             let manipulatedLine = this.graph.getLineByInput(this.selecting.node.id,this.selecting.IOSocket);
             if(manipulatedLine != null){
-              this.graph.removeLine(manipulatedLine);
+              await this.graph.removeLine(manipulatedLine);
               this.process();
               this.selecting = new UIElement();
               this.selecting.type = "output";
@@ -462,10 +461,10 @@ class UI{
       this.draw();
     }
 
-    keydown(evt){
+    async keydown(evt){
       let code = evt.keyCode;
       switch(code){
-        case 88: if(this.selecting != null && this.selecting.node.id != 0){this.changeContextMenu("default",null); this.graph.removeNode(this.selecting.node.id); this.process()};
+        case 88: if(this.selecting != null && this.selecting.node.id != 0){this.changeContextMenu("default",null); await this.graph.removeNode(this.selecting.node.id); this.process()};
         default: ;
       }
     }

@@ -316,8 +316,8 @@ class NodeIO{
       }
     }
 
-    removeLine(line){
-      this.#registerCommands([new Command("removeEdge",line.commandForm())]);
+    async removeLine(line){
+      await this.#registerCommands([new Command("removeEdge",line.commandForm())]);
       this.#_removeLine(line);
     }
 
@@ -335,8 +335,8 @@ class NodeIO{
       this.#nodes.push(node);
     }
   
-    addNamedNode(nodeName,position){
-      this.#registerCommands([new Command("addNode", [nodeName,position.x.toString(),position.y.toString()])]);
+    async addNamedNode(nodeName,position){
+      await this.#registerCommands([new Command("addNode", [nodeName,position.x.toString(),position.y.toString()])]);
 
       this.#_addNode(new GraphNode(nodeName,position,this.#context));
     }
@@ -364,8 +364,8 @@ class NodeIO{
       }
     }
 
-    removeNode(id){
-      this.#registerCommands([new Command("removeNode",[id.toString()])]);
+    async removeNode(id){
+      await this.#registerCommands([new Command("removeNode",[id.toString()])]);
       this.#_removeNode(id);
     }
 
@@ -378,12 +378,12 @@ class NodeIO{
       }
     }
     //the node whose default value is being modified, the nodeID of the default value and the parameters being changed(could be a number a string or a 4-value array for color)
-    modifyDefault(node, nodeID,parameters){
+    async modifyDefault(node, nodeID,parameters){
       let args = [nodeID.toString(),node.id.toString()];
       for(const parameter of parameters){
         args.push(parameter.toString());
       }
-      this.#registerCommands([new Command("modifyDefault",args)]);
+      await this.#registerCommands([new Command("modifyDefault",args)]);
       this.#_modifyDefault(node, nodeID,parameters);
     }
 
