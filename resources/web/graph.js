@@ -407,7 +407,7 @@ class NodeIO{
     }
     //commands are sent to be executed server-side
     #registerCommands(commands, callback){
-        let inner = async ()=> {
+        let inner = async (first=false)=> {
           let body = {commands:commands};
           const options = {
             method: "POST",
@@ -422,13 +422,19 @@ class NodeIO{
           if(callback != null){
             await callback(final=="ok");
           }
+          if(first){
+            while(this.#commandRequestQueue.length > 0){
+              await this.#commandRequestQueue[0]();
+              this.#commandRequestQueue.shift();
+            }
+          }
           if(this.#commandRequestQueue.length > 0){
-            this.#commandRequestQueue.shift()();
+            
           }
           
       }
       if(this.#commandRequestQueue.length == 0){
-        inner();
+        inner(true);
       }else{
         this.#commandRequestQueue.push(inner);
       }
