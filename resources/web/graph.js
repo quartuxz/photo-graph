@@ -318,7 +318,7 @@ class NodeIO{
     }
 
     removeLine(line,callback){
-      this.#registerCommands([new Command("removeEdge",line.commandForm())],async (_)=>{await callback();});
+      this.#registerCommands([new Command("removeEdge",line.commandForm())],callback);
       this.#_removeLine(line);
     }
 
@@ -366,7 +366,7 @@ class NodeIO{
     }
 
     removeNode(id,callback){
-      this.#registerCommands([new Command("removeNode",[id.toString()])],async (_)=>{await callback();});
+      this.#registerCommands([new Command("removeNode",[id.toString()])],callback);
       this.#_removeNode(id);
     }
 
@@ -384,7 +384,7 @@ class NodeIO{
       for(const parameter of parameters){
         args.push(parameter.toString());
       }
-      this.#registerCommands([new Command("modifyDefault",args)],async (_)=>{await callback();});
+      this.#registerCommands([new Command("modifyDefault",args)],callback);
       this.#_modifyDefault(node, nodeID,parameters);
     }
 
@@ -400,13 +400,13 @@ class NodeIO{
     addLine(line, callback){
       this.#_addLine(line);
       let inner = async () => {
-        this.#registerCommands([new Command("addEdge",line.commandForm())],async (succesful)=>{ if(!succesful){this.#_removeLine(line);} await callback();});
+        this.#registerCommands([new Command("addEdge",line.commandForm())],callback,(succesful)=>{ if(!succesful){this.#_removeLine(line);}});
       };
       inner();
       
     }
     //commands are sent to be executed server-side
-    #registerCommands(commands, callback){
+    #registerCommands(commands, callback1,callback2=null){
         let inner = async (first=false)=> {
           let body = {commands:commands};
           const options = {
@@ -419,8 +419,8 @@ class NodeIO{
           let response = await fetch("/command", options);
           if(response.status==401){window.location.href = "login";}
           let final = await response.text();
-          if(callback != null){
-            await callback(final=="ok");
+          if(callback2 != null){
+            callback2(final=="ok");
           }
           console.log("something");
           if(first){
@@ -428,6 +428,9 @@ class NodeIO{
             while(this.#commandRequestQueue.length > 0){
               await this.#commandRequestQueue[0]();
               this.#commandRequestQueue.shift();
+            }
+            if(callback1 != null){
+              await callback1();
             }
           }
           
