@@ -318,7 +318,7 @@ class NodeIO{
     }
 
     removeLine(line,callback){
-      this.#registerCommands([new Command("removeEdge",line.commandForm())],(_)=>{callback();});
+      this.#registerCommands([new Command("removeEdge",line.commandForm())],async (_)=>{await callback();});
       this.#_removeLine(line);
     }
 
@@ -366,7 +366,7 @@ class NodeIO{
     }
 
     removeNode(id,callback){
-      this.#registerCommands([new Command("removeNode",[id.toString()])],(_)=>{callback();});
+      this.#registerCommands([new Command("removeNode",[id.toString()])],async (_)=>{await callback();});
       this.#_removeNode(id);
     }
 
@@ -384,7 +384,7 @@ class NodeIO{
       for(const parameter of parameters){
         args.push(parameter.toString());
       }
-      this.#registerCommands([new Command("modifyDefault",args)],(_)=>{callback();});
+      this.#registerCommands([new Command("modifyDefault",args)],async (_)=>{await callback();});
       this.#_modifyDefault(node, nodeID,parameters);
     }
 
@@ -400,7 +400,7 @@ class NodeIO{
     addLine(line, callback){
       this.#_addLine(line);
       let inner = async () => {
-        this.#registerCommands([new Command("addEdge",line.commandForm())],(succesful)=>{callback(); if(!succesful){this.#_removeLine(line);}});
+        this.#registerCommands([new Command("addEdge",line.commandForm())],async (succesful)=>{ if(!succesful){this.#_removeLine(line); await callback();}});
       };
       inner();
       
@@ -423,18 +423,18 @@ class NodeIO{
             await callback(final=="ok");
           }
           if(first){
+            this.#commandRequestQueue.shift();
             while(this.#commandRequestQueue.length > 0){
               await this.#commandRequestQueue[0]();
               this.#commandRequestQueue.shift();
             }
           }
-          if(this.#commandRequestQueue.length > 0){
-            
-          }
           
       }
       if(this.#commandRequestQueue.length == 0){
+        this.#commandRequestQueue.push(inner);
         inner(true);
+        
       }else{
         this.#commandRequestQueue.push(inner);
       }
