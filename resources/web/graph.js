@@ -400,7 +400,7 @@ class NodeIO{
     addLine(line, callback){
       this.#_addLine(line);
       let inner = async () => {
-        this.#registerCommands([new Command("addEdge",line.commandForm())],async (succesful)=>{ if(!succesful){this.#_removeLine(line); await callback();}});
+        this.#registerCommands([new Command("addEdge",line.commandForm())],async (succesful)=>{ if(!succesful){this.#_removeLine(line);} await callback();});
       };
       inner();
       
@@ -422,6 +422,7 @@ class NodeIO{
           if(callback != null){
             await callback(final=="ok");
           }
+          console.log("something");
           if(first){
             this.#commandRequestQueue.shift();
             while(this.#commandRequestQueue.length > 0){
