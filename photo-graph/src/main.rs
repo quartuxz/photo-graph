@@ -181,7 +181,7 @@ async fn create_account(data: web::Data<AppState>, userCred:Json<UserCredentials
         .await
         .unwrap();
 
-    let _ = fs::create_dir_all(util::RESOURCE_PATH.clone()+r"\images\"+r"\"+&userCred.username);
+    let _ = fs::create_dir_all(PathBuf::from_iter([util::RESOURCE_PATH.clone(),"images".to_owned(),userCred.username.clone()]));
 
     HttpResponse::Ok().content_type("text").body("ok")
 }
@@ -420,7 +420,7 @@ async fn upload_image(request: HttpRequest,mut payload: Multipart)->impl Respond
         return Redirect::to("/web/upload_image.html?bad_name").see_other();
     }
     let image = match image::load_from_memory(&file_data){Ok(val)=>val, Err(_)=>return Redirect::to("/web/upload_image.html?bad_image").see_other()};
-    match image.save_with_format(util::RESOURCE_PATH.clone()+r"\images\"+r"\"+&util::sanitize(&claim.username,true)+r"\"+&cleanFileName+".png", image::ImageFormat::Png){
+    match image.save_with_format(PathBuf::from_iter([util::RESOURCE_PATH.clone(),"images".to_owned(),util::sanitize(&claim.username,true),cleanFileName+".png"]), image::ImageFormat::Png){
         Ok(_)=>(),
         Err(_)=>return Redirect::to("/web/upload_image.html?bad_image").see_other()
     };

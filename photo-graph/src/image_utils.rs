@@ -64,7 +64,7 @@ pub fn color_burn_formula(foreground:&Rgba<u8>,background:&Rgba<u8>)->Rgba<u8>{
 
 pub fn divide_rgba_by_rgba(lhs:&Rgba<u8>,rhs:&Rgba<u8>, maxOnDivZero : bool)->Rgba<u8>{
     if maxOnDivZero{
-        Rgba([(if rhs.0[0] != 0 {f32::from(lhs.0[0])/(f32::from(rhs.0[0])/255.0)}else{255.0}).round() as u8,(if rhs.0[1] != 0 {f32::from(lhs.0[1])/(f32::from(rhs.0[1])/255.0)}else{255.0}).round() as u8,(if rhs.0[2] != 0 {f32::from(lhs.0[2])/(f32::from(rhs.0[2])/255.0)}else{255.0}).round() as u8,(if rhs.0[3] != 0 {f32::from(lhs.0[3])/(f32::from(rhs.0[3])/255.0)}else{255.0}).round() as u8 ])
+        Rgba([(if(lhs.0[0]==0){0.0} else if rhs.0[0] != 0 {f32::from(lhs.0[0])/(f32::from(rhs.0[0])/255.0)}else{255.0}).round() as u8,(if(lhs.0[1]==0){0.0} else if rhs.0[1] != 0 {f32::from(lhs.0[1])/(f32::from(rhs.0[1])/255.0)}else{255.0}).round() as u8,(if(lhs.0[2]==0){0.0} else if rhs.0[2] != 0 {f32::from(lhs.0[2])/(f32::from(rhs.0[2])/255.0)}else{255.0}).round() as u8,(if(lhs.0[3]==0){0.0} else if rhs.0[3] != 0 {f32::from(lhs.0[3])/(f32::from(rhs.0[3])/255.0)}else{255.0}).round() as u8 ])
     }else{
         Rgba([(if rhs.0[0] != 0 {f32::from(lhs.0[0])/(f32::from(rhs.0[0])/255.0)}else{0.0}).round() as u8,(if rhs.0[1] != 0 {f32::from(lhs.0[1])/(f32::from(rhs.0[1])/255.0)}else{0.0}).round() as u8,(if rhs.0[2] != 0 {f32::from(lhs.0[2])/(f32::from(rhs.0[2])/255.0)}else{0.0}).round() as u8,(if rhs.0[3] != 0 {f32::from(lhs.0[3])/(f32::from(rhs.0[3])/255.0)}else{0.0}).round() as u8 ])
     }
