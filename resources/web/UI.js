@@ -175,7 +175,8 @@ class UI{
   
     constructor(graph, canvas,context){
       this.loadingImage.src = "loading.png";
-
+      this.loadingImage.onload = ()=>{this.draw()};
+      
       this.contextMenu = new ContextMenu("default",null,this);
 
       this.graph = graph;
