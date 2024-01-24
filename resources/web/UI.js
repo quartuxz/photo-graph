@@ -172,6 +172,7 @@ class UI{
     background = new Image();
     loadingImage = new Image();
     drawLine = null;
+    currentProcessPrecedence = 0;
   
     constructor(graph, canvas,context){
       this.loadingImage.src = "loading.png";
@@ -182,6 +183,7 @@ class UI{
       this.graph = graph;
       this.canvas = canvas;
       this.context = context;
+      this.context.imageSmoothingEnabled = false;
   
       this.canvas.height = 600;
       this.canvas.width = 1000;
@@ -225,25 +227,26 @@ class UI{
     }
 
     async process(){
+      let precedence = ++this.currentProcessPrecedence;
       this.background = this.loadingImage;
       this.draw(1);
       const options = {
-        method: "POST",
-        headers: {
-          "Content-Type": "text",
-        }
+        method: "POST"
       };
       let response = await fetch("/process",options);
       if(response.status==401){window.location.href = "login";}
       let blobResponse = await response.blob();
       let url =window.URL.createObjectURL(blobResponse);
-      this.background = new Image();
-      this.background.src=url;
-      this.background.onload = ()=>{
-        this.draw(2);
+      if(precedence>=this.currentProcessPrecedence){
+        this.background = new Image();
+        this.background.src=url;
+        this.background.onload = ()=>{
+          this.draw(2);
+        }
+        
+        document.getElementById("downloadButton").href=url;
       }
-      
-      document.getElementById("downloadButton").href=url;
+
     }
 
     #drawTransparencyBackground(){
@@ -276,11 +279,15 @@ class UI{
       this.context.clearRect(0,0,this.canvas.width,this.canvas.height);
       this.#drawTransparencyBackground();
       //draw background image
-      if(this.canvas.width < this.canvas.height){
-        this.context.drawImage(this.background,0,(this.canvas.height-this.background.height*(this.canvas.width/this.background.width))/2,this.canvas.width,this.background.height*(this.canvas.width/this.background.width));
-      }else{
-        this.context.drawImage(this.background,(this.canvas.width-this.background.width*(this.canvas.height/this.background.height))/2,0,this.background.width*(this.canvas.height/this.background.height),this.canvas.height);
-      }
+      
+      let hRatio = this.canvas.width  / this.background.width    ;
+      let vRatio =  this.canvas.height / this.background.height  ;
+      let ratio  = Math.min ( hRatio, vRatio );
+      let centerShift_x = ( this.canvas.width - this.background.width*ratio ) / 2;
+      let centerShift_y = ( this.canvas.height - this.background.height*ratio ) / 2; 
+
+      this.context.drawImage(this.background, centerShift_x,centerShift_y,this.background.width*ratio, this.background.height*ratio); 
+
 
       this.context.restore();
       if(this.drawLine!=null && processCall == 1){

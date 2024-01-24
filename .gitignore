@@ -1,5 +1,6 @@
 /target
 .env
+host.txt
 secret.txt
 resources/images/**
 sqlite.*

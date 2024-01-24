@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, collections::HashMap, default};
 
-use crate::image_utils::{multiply_color, saturating_add_rgba};
+use crate::image_utils::{bilinear_interpolate, multiply_color, saturating_add_rgba};
 
 use super::*;
 
@@ -107,45 +107,13 @@ impl Node for RotationNode{
             match self.mode{
                 RotationMode::precise =>{
                     self.buffer = RgbaImage::from_fn((maxX-minX).ceil() as u32, (maxY-minY).ceil() as u32, |x,y|{
-                        let mut rotX = ((x as f64)-halfWidth+minX)*self.angle.cos()-((y as f64)-halfHeight+minY)*self.angle.sin();
-                        let mut rotY = ((x as f64)-halfWidth+minX)*self.angle.sin()+((y as f64)-halfHeight+minY)*self.angle.cos();
+                        let mut rotX = (((x as f64)+0.5)-halfWidth+minX)*self.angle.cos()-(((y as f64)+0.5)-halfHeight+minY)*self.angle.sin();
+                        let mut rotY = (((x as f64)+0.5)-halfWidth+minX)*self.angle.sin()+(((y as f64)+0.5)-halfHeight+minY)*self.angle.cos();
                         rotX += halfWidth;
                         rotY += halfHeight;
-                        let mut finalPix = Rgba([0,0,0,0]);
-                        //top left
-                        {
-                            let source = match self.rotating.get_pixel_checked((rotX.floor()) as u32, (rotY.floor()) as u32){
-                                Some(val) if rotX>0.0 && rotY >0.0=> val.clone(),
-                                Some(_) => Rgba([0,0,0,0]),
-                                None => Rgba([0,0,0,0])
-                            };
-                            finalPix = saturating_add_rgba(&finalPix, &multiply_color(&source, (((rotX.floor()+1.0) - (rotX))*((rotY.floor()+1.0)-(rotY))).abs() as f32))
-                        }
-                        if rotX.floor() != rotX.ceil(){
-                            let source = match self.rotating.get_pixel_checked((rotX.ceil()) as u32, (rotY.floor()) as u32){
-                                Some(val) if rotX>0.0 && rotY >0.0=> val.clone(),
-                                Some(_) => Rgba([0,0,0,0]),
-                                None => Rgba([0,0,0,0])
-                            };
-                            finalPix = saturating_add_rgba(&finalPix, &multiply_color(&source, (((rotX.floor()+1.0) - (rotX+1.0))*((rotY.floor()+1.0)-(rotY))).abs() as f32))
-                        }
-                        if rotY.floor() != rotY.ceil(){
-                            let source = match self.rotating.get_pixel_checked((rotX.floor()) as u32, (rotY.ceil()) as u32){
-                                Some(val) if rotX>0.0 && rotY >0.0=> val.clone(),
-                                Some(_) => Rgba([0,0,0,0]),
-                                None => Rgba([0,0,0,0])
-                            };
-                            finalPix = saturating_add_rgba(&finalPix, &multiply_color(&source, (((rotX.floor()+1.0) - (rotX))*((rotY.floor()+1.0)-(rotY+1.0))).abs() as f32))
-                        }
-                        if rotX.floor() != rotX.ceil() && rotY.floor() != rotY.ceil(){
-                            let source = match self.rotating.get_pixel_checked((rotX.ceil()) as u32, (rotY.ceil()) as u32){
-                                Some(val) if rotX>0.0 && rotY >0.0=> val.clone(),
-                                Some(_) => Rgba([0,0,0,0]),
-                                None => Rgba([0,0,0,0])
-                            };
-                            finalPix = saturating_add_rgba(&finalPix, &multiply_color(&source, (((rotX.floor()+1.0) - (rotX+1.0))*((rotY.floor()+1.0)-(rotY+1.0))).abs() as f32))
-                        }
-                        finalPix
+                        
+                        bilinear_interpolate(&self.rotating, rotX, rotY)
+                        
                     });
                 }
                 RotationMode::fast => {

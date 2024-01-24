@@ -3,7 +3,8 @@ use std::fs;
 
 lazy_static!{
     pub static ref RESOURCE_PATH : String = "resources/".to_string();
-    pub static ref SECRET : String = fs::read_to_string(r"secret.txt").unwrap();
+    pub static ref SECRET : String = fs::read_to_string("secret.txt").unwrap();
+    pub static ref HOST : String = fs::read_to_string("host.txt").unwrap();
 }
 
 pub fn sanitize(dirty:&str,isDir:bool)->String{
