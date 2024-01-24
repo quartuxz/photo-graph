@@ -342,7 +342,6 @@ impl Graph{
 
     pub fn execute_commands(&mut self, mut commands:Commands)->GraphResult<()>{
         for cmd in &commands{
-            println!("{}",cmd);
             match cmd.name.as_str(){
                 "removeEdge" => {if cmd.args.len() < 4{return Err(GraphError::IllFormedCommand)} self.remove_edge_and_replace_with_default(&Edge {outputNode:cmd.args[0].parse()?,outputIndex:cmd.args[1].parse()?,inputNode:cmd.args[2].parse()?,inputIndex:cmd.args[3].parse()?}, true)?;},
                 "addEdge" => {if cmd.args.len() < 4{return Err(GraphError::IllFormedCommand)} self.add_edge(Edge {outputNode:cmd.args[0].parse()?,outputIndex:cmd.args[1].parse()?,inputNode:cmd.args[2].parse()?,inputIndex:cmd.args[3].parse()?})?},

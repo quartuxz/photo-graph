@@ -1,24 +1,12 @@
 
-function saveOnclick(){
 
-  const options = {
-      method: "POST",
-      headers: {
-          "Content-Type": "application/json",
-      },
-      body: JSON.stringify({fileName:graphFile})
-  };
-  fetch("/saveGraph", options);
-  return true;
-}
 
 
 
 async function main(){
   
   await GraphNode.loadNodeTemplates();
-  document.getElementById("graphName").innerHTML = graphFile;
-  document.getElementById("saveButton").onclick = saveOnclick;
+  document.getElementById("graphName").innerHTML = graphName;
   document.getElementById("uploadImageButton").onclick = ()=>{ window.location.href = "upload_image.html";};
   document.getElementById("selectGraphButton").onclick = ()=>{window.location.href = "graph_selector.html";};
   document.getElementById("loginPage").href = "login.html";
@@ -30,6 +18,7 @@ async function main(){
 
   const options = {
     method: "POST",
+    body:graphName
   };
   let response = await fetch("/retrieveGraph", options);
   if(response.status==401){window.location.href = "login.html";}

@@ -1,5 +1,4 @@
-let graphFile = getCookie("graphFile");
-
+let graphName = getCookie("graphName");
 
 
 let graphFontStyle = "15px seif";
@@ -422,6 +421,7 @@ class NodeIO{
           if(callback2 != null){
             callback2(final=="ok");
           }
+          
           console.log("something");
           if(first){
             this.#commandRequestQueue.shift();

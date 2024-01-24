@@ -12,6 +12,7 @@ use std::{env, thread};
 use std::{fs, collections::HashMap,io::Write};
 use std::sync::Mutex;
 
+use thiserror::Error;
 use uuid::Uuid;
 
 
@@ -66,8 +67,6 @@ struct param{
 }
 
 struct AppState{
-    graphs : Mutex<HashMap<String,graph::Graph>>,
-    currentID : Mutex<u64>,
     db : sqlx::Pool<Sqlite>
 
 }
@@ -78,7 +77,7 @@ fn sanitize(dirty: &str)->String{
 }
 
 
-fn build_session_cookie(username:&str,graphID:&str)->Cookie<'static>{
+fn build_session_cookie(username:&str,graphName:&str)->Cookie<'static>{
     let my_iat = Utc::now().timestamp();
     let my_exp = Utc::now()
         .checked_add_signed(Duration::days(1))
@@ -89,7 +88,7 @@ fn build_session_cookie(username:&str,graphID:&str)->Cookie<'static>{
         iat: my_iat as usize,
         exp: my_exp as usize,
         username: username.to_string().clone(),
-        graphID:graphID.to_string().clone()
+        graphName:graphName.to_string().clone()
     };
 
     let token = match encode(
@@ -143,14 +142,6 @@ fn get_claim_from_token(token:String)->Option<LoginClaim>{
     return Some(token_data.claims);
 }
 
-async fn corroborate_claim(grph : &graph::Graph, request: &HttpRequest)->bool{
-    let usernameToken = match request.cookie("session"){Some(val)=>val, None=> return false}.value().to_owned();
-    let res = get_claim_from_token(usernameToken);
-    match res{
-        Some(claim) => grph.get_user() == claim.username,
-        None => false
-    }
-}
 
 #[post("/createAccount")]
 async fn create_account(data: web::Data<AppState>, userCred:Json<UserCredentials>)->impl Responder{
@@ -193,7 +184,7 @@ struct LoginClaim {
     iat: usize,
     exp: usize,
     username: String,
-    graphID:String
+    graphName:String
 }
 
 #[post("/login")]
@@ -222,16 +213,19 @@ async fn retrieve_graph_file_list(request: HttpRequest,data: web::Data<AppState>
     HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&out).unwrap())
 }
 
-#[post("/loadGraph")]
-async fn load_graph(request: HttpRequest,data: web::Data<AppState>, body:web::Bytes)->impl Responder{
-    let mut graphs: std::sync::MutexGuard<'_, HashMap<String, Graph>> = data.graphs.lock().unwrap();
-    let claim = match get_claim_from_token(match request.cookie("session"){Some(val)=>val, None=>return HttpResponse::Unauthorized().into()}.value().to_owned()){Some(val)=>val,None=>return HttpResponse::Unauthorized().into()};
+#[derive(Error, Debug,PartialEq)]
+pub enum LoadError{
+    #[error("graph not found!")]
+    graphNotFound,
+    #[error("graph not valid!")]
+    graphNotValid
+}
 
-    let mut graphName = match String::from_utf8(body.to_vec()){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()};
-    graphName = sanitize(&graphName);
+async fn load_graph(data: &web::Data<AppState>, claim :&LoginClaim)->Result<Graph,LoadError>{
+
     let result = sqlx::query("SELECT graph FROM graphs WHERE username=$1 AND graphName=$2")
         .bind(claim.username.clone())
-        .bind(graphName.clone())
+        .bind(claim.graphName.clone())
         .fetch_all(&data.db)
         .await
         .unwrap();
@@ -239,29 +233,23 @@ async fn load_graph(request: HttpRequest,data: web::Data<AppState>, body:web::By
     if(!result.is_empty()){
         contents= result[0].get::<String,&str>("graph");
     }else{
-        return HttpResponse::NotFound().body("graph not found");
+        return Err(LoadError::graphNotFound);
     }
     //username is guaranteed to be valid because it was found in the database
     let mut loadedGraph = Graph::new(claim.username.clone());
-    match loadedGraph.execute_commands(match serde_json::from_str(&contents){Ok(val)=>val, Err(_)=>return HttpResponse::InternalServerError().into()}){Ok(_)=>(),Err(_)=>return HttpResponse::BadRequest().into()};
+    match loadedGraph.execute_commands(match serde_json::from_str(&contents){Ok(val)=>val, Err(_)=>return Err(LoadError::graphNotValid)}){Ok(_)=>(),Err(_)=>return Err(LoadError::graphNotValid)};
     
-
-    let graphID = Uuid::new_v4();
-    graphs.insert(graphID.to_string(), loadedGraph);
-
-    HttpResponse::Ok().cookie(build_session_cookie(&claim.username,&graphID.to_string())).finish()
+    return Ok(loadedGraph);
 }
 
 #[post("/retrieveGraph")]
-async fn retrieve_graph(request: HttpRequest,data: web::Data<AppState>, body:web::Bytes)->impl Responder{
-    
-    let graphs = data.graphs.lock().unwrap();
-    let claim = match get_claim_from_token(match request.cookie("session"){Some(val)=>val, None=>return HttpResponse::Unauthorized().into()}.value().to_owned()){Some(val)=>val,None=>return HttpResponse::Unauthorized().into()};
-    let graph = match graphs.get(&claim.graphID){Some(val)=>val, None=>return HttpResponse::Unauthorized().into()};
-    if !corroborate_claim(graph, &request).await{
-        return HttpResponse::Unauthorized().into()
-    }
-    HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&graph.get_command_history()).unwrap())
+async fn retrieve_graph(request: HttpRequest,data: web::Data<AppState>, body: web::Bytes)->impl Responder{
+    let mut claim = match get_claim_from_token(match request.cookie("session"){Some(val)=>val, None=>return HttpResponse::Unauthorized().into()}.value().to_owned()){Some(val)=>val,None=>return HttpResponse::Unauthorized().into()};
+    claim.graphName = match String::from_utf8(body.to_vec()){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()};
+    claim.graphName = sanitize(&claim.graphName);
+    let graph = match load_graph(&data, &claim).await{Ok(val)=>val, Err(_)=>return HttpResponse::Unauthorized().into()};
+
+    HttpResponse::Ok().cookie(build_session_cookie(&claim.username, &claim.graphName)).content_type("application/json").body(serde_json::to_string(&graph.get_command_history()).unwrap())
 }
 
 #[derive(Deserialize)]
@@ -269,57 +257,46 @@ struct SaveInfo{
     fileName: String
 }
 
-#[post("/saveGraph")]
-async fn save_graph(request: HttpRequest,data: web::Data<AppState>, saveInfo:Json<SaveInfo>)->impl Responder{
-    let graphs = data.graphs.lock().unwrap();
-    let claim = match get_claim_from_token(match request.cookie("session"){Some(val)=>val, None=>return HttpResponse::Unauthorized()}.value().to_owned()){Some(val)=>val,None=>return HttpResponse::Unauthorized()};
-    let graph = match graphs.get(&claim.graphID){Some(val)=>val,None=>return HttpResponse::Unauthorized()};
-    if !corroborate_claim(graph, &request).await{
-        return HttpResponse::Unauthorized();
-    }
+async fn save_graph(data: &web::Data<AppState>, graphName:&str, graph:&Graph, username:&str){
 
 
     let results = sqlx::query("SELECT graph FROM graphs WHERE username=$1 AND graphName=$2")
-        .bind(claim.username.clone())
-        .bind(sanitize(&saveInfo.fileName))
+        .bind(username)
+        .bind(sanitize(&graphName))
         .fetch_all(&data.db)
         .await
         .unwrap();
     if !results.is_empty(){
         let _result = sqlx::query("UPDATE graphs SET graph=$3 WHERE username=$1 AND graphName=$2")
-            .bind(claim.username)
-            .bind(sanitize(&saveInfo.fileName))
+            .bind(username)
+            .bind(sanitize(&graphName))
             .bind(serde_json::to_string(graph.get_command_history()).unwrap())
             .execute(&data.db)
             .await
             .unwrap();
     }else{
         let _result = sqlx::query("INSERT INTO graphs (username,graphName,graph) VALUES ($1,$2,$3)")
-            .bind(claim.username)
-            .bind(sanitize(&saveInfo.fileName))
+            .bind(username)
+            .bind(sanitize(&graphName))
             .bind(serde_json::to_string(graph.get_command_history()).unwrap())
             .execute(&data.db)
             .await
             .unwrap();
     }
-
-
-
-    HttpResponse::Ok()
 }
 
 #[post("/createGraph")]
-async fn create_graph(request: HttpRequest,data: web::Data<AppState>)->impl Responder{
-    let mut graphs = data.graphs.lock().unwrap();
+async fn create_graph(request: HttpRequest,data: web::Data<AppState>,body:web::Bytes)->impl Responder{
     let claim = match get_claim_from_token(match request.cookie("session"){Some(val)=>val, None=>return HttpResponse::Unauthorized().into()}.value().to_owned()){Some(val)=>val,None=>return HttpResponse::Unauthorized().into()};
-
+    let mut graphName = match String::from_utf8(body.to_vec()){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()};
+    graphName = sanitize(&graphName);
 
     let newGraph = Graph::new(claim.username.clone());
 
-    let graphID = Uuid::new_v4();
-    graphs.insert(graphID.to_string(), newGraph);
 
-    HttpResponse::Ok().cookie(build_session_cookie(&claim.username, &graphID.to_string())).finish()
+    save_graph(&data, &graphName,&newGraph,&claim.username).await;
+
+    HttpResponse::Ok().cookie(build_session_cookie(&claim.username, &graphName)).finish()
 }
 
 
@@ -327,12 +304,8 @@ async fn create_graph(request: HttpRequest,data: web::Data<AppState>)->impl Resp
 
 #[post("/process")]
 async fn process_graph(request: HttpRequest, data: web::Data<AppState>)-> impl Responder {
-    let mut graphs = data.graphs.lock().unwrap();
     let claim = match get_claim_from_token(match request.cookie("session"){Some(val)=>val, None=>return HttpResponse::Unauthorized().into()}.value().to_owned()){Some(val)=>val,None=>return HttpResponse::Unauthorized().into()};
-    let graph = match graphs.get_mut(&claim.graphID){Some(val)=>val,None=>return HttpResponse::Unauthorized().into()};
-    if !corroborate_claim(graph, &request).await{
-        return HttpResponse::Unauthorized().into();
-    }
+    let mut graph = match load_graph(&data, &claim).await{Ok(val)=>val,Err(_)=>return HttpResponse::Unauthorized().into()};
     let outputImage = match graph.process(){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()};
     let mut bytes: Vec<u8> = Vec::new();
     outputImage.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png).unwrap();
@@ -353,12 +326,15 @@ async fn landing()->impl Responder{
 
 #[post("/command")]
 async fn command_graph(request: HttpRequest, data: web::Data<AppState>, commands: Json<commandGraphData>)-> impl Responder{
-    let mut graphs = data.graphs.lock().unwrap();
     let claim = match get_claim_from_token(match request.cookie("session"){Some(val)=>val, None=>return HttpResponse::Unauthorized().into()}.value().to_owned()){Some(val)=>val,None=>return HttpResponse::Unauthorized().into()};
-    let graph = match graphs.get_mut(&claim.graphID){Some(val)=>val,None=>return HttpResponse::Unauthorized().into()};
-    if !corroborate_claim(graph, &request).await{
-        return HttpResponse::Unauthorized().into();
+    let mut graph = match load_graph(&data, &claim).await{Ok(val)=>val,Err(_)=>return HttpResponse::Unauthorized().into()};
+
+    for command in &commands.commands{
+        println!("{}",command);
     }
+
+
+
     HttpResponse::Ok().content_type("text").body(match graph.execute_commands(commands.commands.clone()).err(){
         Some(error) => match error{
             graph::GraphError::Cycle=>"cycle",
@@ -369,7 +345,7 @@ async fn command_graph(request: HttpRequest, data: web::Data<AppState>, commands
             graph::GraphError::IllFormedCommand => "ill-formed command",
             graph::GraphError::NError(_) => "node error"
              },
-        None => "ok"
+        None => { save_graph(&data, &claim.graphName,&graph,&claim.username).await; "ok"}
     })
 }
 
@@ -472,10 +448,7 @@ async fn main() -> std::io::Result<()> {
 
     
 
-    let graphs = HashMap::new();
     let appState = web::Data::new(AppState{
-        graphs: Mutex::new(graphs),
-        currentID: Mutex::new(0),
         db: db
     });
 
@@ -485,8 +458,6 @@ async fn main() -> std::io::Result<()> {
             .service(login)
             .service(create_account)
             .service(retrieve_graph)
-            .service(save_graph)
-            .service(load_graph)
             .service(create_graph)
             .service(retrieve_graph_file_list)
             .service(process_graph)
@@ -497,7 +468,7 @@ async fn main() -> std::io::Result<()> {
             .service(command_graph)
             .service(upload_image)
     })
-    .bind(("0.0.0.0", 8088))?
+    .bind(("localhost", 8088))?
     .run()
     .await
 }

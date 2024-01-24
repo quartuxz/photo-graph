@@ -2,24 +2,15 @@
 
 let graphFiles = null;
 async function onsubmitCreateForm(){
-    let graphFile = document.getElementById("graphName").value
+    let graphName = document.getElementById("graphName").value
     const options = {
         method: "POST",
+        body: graphName
     };
     let response = await fetch("/createGraph", options);
     if(response.status==401){window.location.href = "login.html";}
     
-    const options2 = {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({fileName:graphFile})
-    };
-    let response2 = await fetch("/saveGraph", options2);
-    if(response2.status==401){window.location.href = "login.html";}
-    
-    setCookie("graphFile",graphFile,9999);
+    setCookie("graphName",graphName,9999);
 
     window.location.href = "main.html";
 
@@ -39,16 +30,7 @@ function onsubmitLoadForm(){
         for(const graphFile of graphFiles){
             console.log(graphFile);
             if(document.getElementById(graphFile).checked){
-                const options = {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "text",
-                      },
-                    body: graphFile
-                };
-                let response = await fetch("/loadGraph", options);
-                if(response.status==401){window.location.href = "login.html";}
-                setCookie("graphFile",graphFile,9999);
+                setCookie("graphName",graphFile,9999);
                 window.location.href = "main.html";
             }
         }

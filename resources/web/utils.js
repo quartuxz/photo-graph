@@ -1,5 +1,19 @@
 let domainName = window.location.host+"/web/";
 
+
+function saveOnclick(){
+
+  const options = {
+      method: "POST",
+      headers: {
+          "Content-Type": "application/json",
+      },
+      body: JSON.stringify({fileName:graphFile})
+  };
+  fetch("/saveGraph", options);
+  return true;
+}
+
 function setCookie(cname, cvalue, exdays) {
     const d = new Date();
     d.setTime(d.getTime() + (exdays*24*60*60*1000));
