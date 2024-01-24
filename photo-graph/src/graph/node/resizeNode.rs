@@ -106,19 +106,13 @@ impl Node for ResizeNode{
                     self.buffer = RgbaImage::from_fn(((maxX-minX) as i32 +roundedX) as u32, ((maxY-minY) as i32 +roundedY) as u32, |x,y|{
                         let ax = x+minX;
                         let ay = y+minY;
-                        match self.resizing.get_pixel_checked(ax, ay){
-                            Some(val)=> val.clone(),
-                            None=> Rgba([0,0,0,0])
-                        }
+                        self.resizing.get_pixel_checked(ax, ay).unwrap_or(&Rgba([0,0,0,0])).clone()
                     })
                 },
                 //resizes the image, filling the new space with transparency
                 ResizeMode::resize=>{
                     self.buffer = RgbaImage::from_fn((self.resizing.width() as i32 +roundedX) as u32, (self.resizing.height() as i32 +roundedY) as u32, |x,y|{
-                        match self.resizing.get_pixel_checked(x, y){
-                            Some(val)=> val.clone(),
-                            None=> Rgba([0,0,0,0])
-                        }
+                        self.resizing.get_pixel_checked(x, y).unwrap_or(&Rgba([0,0,0,0])).clone()
                     })
                 },
 

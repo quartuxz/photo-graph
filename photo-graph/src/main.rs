@@ -468,7 +468,7 @@ async fn main() -> std::io::Result<()> {
             .service(command_graph)
             .service(upload_image)
     })
-    .bind(("0.0.0.0", 8088))?
+    .bind(("localhost", 8088))?
     .run()
     .await
 }

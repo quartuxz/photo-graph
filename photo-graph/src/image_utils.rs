@@ -1,5 +1,60 @@
-use image::{RgbaImage, Rgba, Pixel};
+use image::{GenericImageView, Pixel, Rgba, RgbaImage};
 
+
+pub fn bilinear_interpolate(image:&RgbaImage,x:f64,y:f64)->Rgba<u8>{
+    if x < 0.0 || y < 0.0 || x > image.width() as f64 || y > image.height() as f64 {
+        return Rgba([0,0,0,0]);
+    } 
+
+    //account for corners points that should yield the color of the corner pixel
+    if (x <= 0.5 && y <= 0.5) ||
+    (x <= 0.5 && (y - (image.height() as f64-1.0)) >= 0.5) ||
+    ((x - (image.width() as f64-1.0)) >= 0.5 && y <= 0.5) ||
+    ((x - (image.width() as f64-1.0)) >= 0.5 && (y - (image.height() as f64-1.0)) >= 0.5)
+    {
+        return image.get_pixel(x.floor() as u32, y.floor() as u32).clone();
+    }
+
+    let mut four_near : [(&Rgba<u8>,(f64,f64));4] = [(&Rgba([0,0,0,0]),(0.0,0.0));4];
+
+    //locate  each of the four nearest pixel centers and store their color and position.
+    let mut i = 0;
+    for yi in [-0.5,0.5]{
+        for xi in [-0.5,0.5]{
+            four_near[i].1.0 = x.round()+xi;
+            four_near[i].1.1 = y.round()+yi;
+            four_near[i].0 = image.get_pixel_checked(four_near[i].1.0.floor() as u32, four_near[i].1.1.floor() as u32).unwrap_or(&Rgba([0,0,0,0]));
+            i+=1;
+        }
+    }
+
+    //make the edge positions mix with the last pixels on those rows/columns instead of with transparency outside the image.
+    if x <= 0.5{
+        four_near[0].0 = four_near[1].0;
+        four_near[2].0 = four_near[3].0;
+    }
+    else if (x - (image.width() as f64-1.0)) >= 0.5{
+        four_near[1].0 = four_near[0].0;
+        four_near[3].0 = four_near[2].0;
+    }
+    if y <= 0.5{
+        four_near[0].0 = four_near[2].0;
+        four_near[1].0 = four_near[3].0;
+    }
+    else if (y - (image.height() as f64-1.0)) >= 0.5{
+        four_near[2].0 = four_near[0].0;
+        four_near[3].0 = four_near[1].0;
+    }
+
+    //do the bilinear interpolation
+    let near01To02 = saturating_add_rgba(&multiply_color(four_near[0].0, ((four_near[1].1.0-x)/(four_near[1].1.0-four_near[0].1.0)) as f32),
+                                                &multiply_color(four_near[1].0, ((x-four_near[0].1.0)/(four_near[1].1.0-four_near[0].1.0)) as f32));
+    let near03To04 = saturating_add_rgba(&multiply_color(four_near[2].0, ((four_near[1].1.0-x)/(four_near[1].1.0-four_near[0].1.0)) as f32),
+                                                &multiply_color(four_near[3].0, ((x-four_near[0].1.0)/(four_near[1].1.0-four_near[0].1.0)) as f32));
+    saturating_add_rgba(&multiply_color(&near01To02, ((four_near[3].1.1-y)/(four_near[3].1.1-four_near[0].1.1)) as f32),
+                        &multiply_color(&near03To04, ((y-four_near[0].1.1)/(four_near[3].1.1-four_near[0].1.1)) as f32))
+
+}
 
 pub fn return_non_empty(image:&RgbaImage)->RgbaImage{
     if image.is_empty(){
