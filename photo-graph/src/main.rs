@@ -10,8 +10,9 @@ use std::io::Cursor;
 use std::path::PathBuf;
 use std::{env, thread};
 use std::{fs, collections::HashMap,io::Write};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, RwLock};
 
+use sysinfo::System;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -67,7 +68,8 @@ struct param{
 }
 
 struct AppState{
-    db : sqlx::Pool<Sqlite>
+    db : sqlx::Pool<Sqlite>,
+    graphs: RwLock<HashMap<String,Arc<Mutex<Graph>>>>
 
 }
 
@@ -248,7 +250,7 @@ async fn retrieve_graph(request: HttpRequest,data: web::Data<AppState>, body: we
     claim.graphName = match String::from_utf8(body.to_vec()){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()};
     claim.graphName = sanitize(&claim.graphName);
     let graph = match load_graph(&data, &claim).await{Ok(val)=>val, Err(_)=>return HttpResponse::Unauthorized().into()};
-
+    let _ = load_cached_graph(&claim, &data).await;
     HttpResponse::Ok().cookie(build_session_cookie(&claim.username, &claim.graphName)).content_type("application/json").body(serde_json::to_string(&graph.get_command_history()).unwrap())
 }
 
@@ -300,13 +302,53 @@ async fn create_graph(request: HttpRequest,data: web::Data<AppState>,body:web::B
 }
 
 
+async fn load_cached_graph(claim:&LoginClaim,data:&web::Data<AppState>)->Result<Arc<Mutex<Graph>>,LoadError>{
 
+
+    let mut sys = System::new_all();
+
+    // First we update all information of our `System` struct.
+    sys.refresh_all();
+
+    println!("memory available: {}",sys.total_memory() as f64/(1024.0_f64).powi(3));
+    println!("memory used: {}",sys.used_memory() as f64/(1024.0_f64).powi(3));
+    println!("swap available: {}",sys.total_swap() as f64/(1024.0_f64).powi(3));
+    println!("swap used: {}",sys.used_swap() as f64/(1024.0_f64).powi(3));
+
+    //if our memory is low(<100 megabytes), we delete the cache
+    if ((sys.total_memory()+sys.total_swap())-(sys.used_memory()+sys.used_swap())) < 100*(1024_u64).pow(2){
+        let mut graphs = data.graphs.write().unwrap();
+        graphs.clear();
+    }
+
+
+    //loads graph into cache on-demand
+    let cacheKey = (claim.username.clone()+&claim.graphName);
+
+    {
+        let mut graphs = data.graphs.write().unwrap();
+        if !graphs.contains_key(&cacheKey){
+            graphs.insert(cacheKey.clone(),match load_graph(&data, &claim).await{Ok(val)=>Arc::new(Mutex::new(val)),Err(err)=>return Err(err)});
+        }
+    }
+    
+    let cachedGraphArc = {
+        let mut graphs = data.graphs.read().unwrap();
+        graphs.get(&cacheKey).unwrap().clone()
+    };
+    Ok(cachedGraphArc)
+}
 
 #[post("/process")]
 async fn process_graph(request: HttpRequest, data: web::Data<AppState>)-> impl Responder {
     let claim = match get_claim_from_token(match request.cookie("session"){Some(val)=>val, None=>return HttpResponse::Unauthorized().into()}.value().to_owned()){Some(val)=>val,None=>return HttpResponse::Unauthorized().into()};
-    let mut graph = match load_graph(&data, &claim).await{Ok(val)=>val,Err(_)=>return HttpResponse::Unauthorized().into()};
-    let outputImage = match graph.process(){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()};
+
+
+
+    let cachedGraphArc = match load_cached_graph(&claim, &data).await{Ok(val)=>val,Err(_)=>return HttpResponse::Unauthorized().into()};
+    let mut cachedGraph = cachedGraphArc.lock().unwrap();
+
+    let outputImage = match cachedGraph.process(){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()};
     let mut bytes: Vec<u8> = Vec::new();
     outputImage.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png).unwrap();
     HttpResponse::Ok().content_type("image/png").body(bytes)
@@ -327,7 +369,9 @@ async fn landing()->impl Responder{
 #[post("/command")]
 async fn command_graph(request: HttpRequest, data: web::Data<AppState>, commands: Json<commandGraphData>)-> impl Responder{
     let claim = match get_claim_from_token(match request.cookie("session"){Some(val)=>val, None=>return HttpResponse::Unauthorized().into()}.value().to_owned()){Some(val)=>val,None=>return HttpResponse::Unauthorized().into()};
-    let mut graph = match load_graph(&data, &claim).await{Ok(val)=>val,Err(_)=>return HttpResponse::Unauthorized().into()};
+    
+    let cachedGraphArc = match load_cached_graph(&claim, &data).await{Ok(val)=>val,Err(_)=>return HttpResponse::Unauthorized().into()};
+    let mut cachedGraph = cachedGraphArc.lock().unwrap();
 
     for command in &commands.commands{
         println!("{}",command);
@@ -335,7 +379,7 @@ async fn command_graph(request: HttpRequest, data: web::Data<AppState>, commands
 
 
 
-    HttpResponse::Ok().content_type("text").body(match graph.execute_commands(commands.commands.clone()).err(){
+    HttpResponse::Ok().content_type("text").body(match cachedGraph.execute_commands(commands.commands.clone()).err(){
         Some(error) => match error{
             graph::GraphError::Cycle=>"cycle",
             graph::GraphError::EdgeNotFound => "edge not found",
@@ -345,7 +389,7 @@ async fn command_graph(request: HttpRequest, data: web::Data<AppState>, commands
             graph::GraphError::IllFormedCommand => "ill-formed command",
             graph::GraphError::NError(_) => "node error"
              },
-        None => { save_graph(&data, &claim.graphName,&graph,&claim.username).await; "ok"}
+        None => { save_graph(&data, &claim.graphName,&cachedGraph,&claim.username).await; "ok"}
     })
 }
 
@@ -425,9 +469,9 @@ async fn sites(_req: HttpRequest, info: web::Path<Info>) -> impl Responder {
     .body(match std::fs::read_to_string(PathBuf::from_iter([util::RESOURCE_PATH.clone(),"web".to_string() ,cleanName.clone()])){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()})
 }
 
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-
     if !Sqlite::database_exists(DB_URL).await.unwrap_or(false) {
         println!("Creating database {}", DB_URL);
         match Sqlite::create_database(DB_URL).await {
@@ -449,7 +493,8 @@ async fn main() -> std::io::Result<()> {
     
 
     let appState = web::Data::new(AppState{
-        db: db
+        db: db,
+        graphs: RwLock::new(HashMap::new())
     });
 
     HttpServer::new(move || {

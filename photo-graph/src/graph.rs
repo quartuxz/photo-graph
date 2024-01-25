@@ -8,6 +8,9 @@ use crate::graph::node::{NodeStatic};
 use self::node::{Node, NodeError, NodeIOType, NodeInputOptions};
 use image::RgbaImage;
 
+
+//the output node is the node that is connected as a supplier of the edge(supplier as in data flows out of the node)
+//the input node is the node that is connected as a receiver of the edge(receiver as in data flows into the node)
 #[derive(Clone, PartialEq, Debug)]
 pub struct Edge{
     inputIndex : u16,
@@ -51,7 +54,8 @@ pub struct Graph{
     IDCount : usize,
     defaultInputEdges: HashMap<usize, Vec<Edge>>,
     commandHistory : Commands,
-    user : String
+    user : String,
+    changedNodes: Vec<usize>
 
 }
 
@@ -113,10 +117,33 @@ impl Graph{
         retval
 
     }
+    //very innefficient, thought about implementing recursively(would work) but stack overflow is a problem.
+    fn clear_changed_buffers(&mut self){
+        for edge in &self.edges{
+            let connected_edges = self.get_edges_connnected_to(edge.1.outputNode);
+            for connected_edge in connected_edges{
+                for nodeID in &self.changedNodes{
+                    if connected_edge.1.outputNode == *nodeID{
+                        self.nodes.get_mut(&nodeID).unwrap().clear_buffers();
+                    }
+                }
+            }
+
+        }  
+        for nodeID in &self.changedNodes{
+            match self.nodes.get_mut(&nodeID){
+                Some(val)=>val.clear_buffers(),
+                None=>()
+            }
+        }
+    }
+
     //processes the final bitmap output for a graph.
     pub fn process(&mut self)->GraphResult<RgbaImage>{
 
 
+        self.clear_changed_buffers();
+        
         let mut includes = true;
         let mut layer = 0;
         while includes {
@@ -136,9 +163,8 @@ impl Graph{
 
         
         if let node::NodeIOType::BitmapType(bitmap) =self.nodes.get_mut(&0).unwrap().get(0)?{
-            for (_key, value) in &mut self.nodes{
-                value.clear_buffers();
-            }
+            self.changedNodes.clear();
+
             Ok(bitmap)
         }else{
             panic!();
@@ -236,6 +262,7 @@ impl Graph{
 
         //undos the adding of the edge to restore to previous state
         return if !self.check_for_cycle(&edge)  {
+            self.changedNodes.push(edge.inputNode);
             self.recalculate_layers();
             GraphResult::Ok(())
         }
@@ -254,6 +281,7 @@ impl Graph{
     fn remove_edge_and_replace_with_default(&mut self, edge:&Edge, recalculate :bool)->GraphResult<()>{
         for thisEdge in &mut self.edges {
                 if thisEdge.1 == *edge {
+                    self.changedNodes.push(edge.inputNode);
                     //replace the removed edge with one that connects the now empty input to the output of the default literal node
                     for i in &self.defaultInputEdges[&edge.inputNode] {
                         if i.inputIndex == edge.inputIndex {
@@ -295,6 +323,7 @@ impl Graph{
             self.edges.remove(removing-removed);
             removed +=1;
         }
+        //remove default nodes associated
         if let Some(removedNode) = removedNodeO{
             for i in (index+1)..(removedNode.get_inputs().len()+index+1){
                 self.remove_node(i,false);
@@ -333,7 +362,7 @@ impl Graph{
     }
 
     pub fn new(user:String)->Self{
-        let mut graph=Graph { nodes : HashMap::new(), edges : vec![], defaultInputEdges : HashMap::new(), commandHistory: Commands::new(), IDCount:0, user};
+        let mut graph=Graph { changedNodes:vec![], nodes : HashMap::new(), edges : vec![], defaultInputEdges : HashMap::new(), commandHistory: Commands::new(), IDCount:0, user};
         graph.add_node(Box::new(node::finalNode::FinalNode::new()));
         //graph.add_node(Box::new(node::imageInputNode::ImageInputNode::new()));
         //graph.add_edge(Edge{inputIndex:0,outputIndex:0,inputNode:0,outputNode:2}).unwrap();
@@ -371,20 +400,22 @@ impl Graph{
                 "modifyDefault" => {if cmd.args.len() < 3{return Err(GraphError::IllFormedCommand)} match self.nodes.get_mut(&cmd.args[0].parse()?){
                     Some(node) => {
                         let nodeName = node.get_node_name();
+                        let nodeID:usize = cmd.args[0].parse()?;
+                        self.changedNodes.push(nodeID);
                         if nodeName == node::floatLiteralNode::FloatLiteralNode::get_node_name_static(){
-                            self.nodes.insert(cmd.args[0].parse()?, Box::new(node::floatLiteralNode::FloatLiteralNode::new(match cmd.args[2].parse(){
+                            self.nodes.insert(nodeID, Box::new(node::floatLiteralNode::FloatLiteralNode::new(match cmd.args[2].parse(){
                                 Ok(parsed) => parsed,
                                 Err(_) => return Err(GraphError::IllFormedCommand)
                             })));
                         }
                         else if nodeName == node::intLiteralNode::IntLiteralNode::get_node_name_static(){
-                            self.nodes.insert(cmd.args[0].parse()?, Box::new(node::intLiteralNode::IntLiteralNode::new(match cmd.args[2].parse(){
+                            self.nodes.insert(nodeID, Box::new(node::intLiteralNode::IntLiteralNode::new(match cmd.args[2].parse(){
                                 Ok(parsed) => parsed,
                                 Err(_) => return Err(GraphError::IllFormedCommand)
                             })));
                         }
                         else if nodeName == node::stringLiteralNode::StringLiteralNode::get_node_name_static(){
-                            self.nodes.insert(cmd.args[0].parse()?, Box::new(node::stringLiteralNode::StringLiteralNode::new(cmd.args[2].clone())));
+                            self.nodes.insert(nodeID, Box::new(node::stringLiteralNode::StringLiteralNode::new(cmd.args[2].clone())));
                         }
                         else if nodeName == node::colorLiteralNode::ColorLiteralNode::get_node_name_static(){
                             if cmd.args.len() < 7{return Err(GraphError::IllFormedCommand)}
@@ -395,7 +426,7 @@ impl Graph{
                                     Err(_) => return Err(GraphError::IllFormedCommand)
                                 }
                             } 
-                            self.nodes.insert(cmd.args[0].parse()?, Box::new(node::colorLiteralNode::ColorLiteralNode::new(image::Rgba(channels))));
+                            self.nodes.insert(nodeID, Box::new(node::colorLiteralNode::ColorLiteralNode::new(image::Rgba(channels))));
                         }
                     }
                     None => return Err(GraphError::NodeNotFound)
@@ -450,10 +481,10 @@ mod tests{
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
-        graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:2,outputNode:5}).unwrap();
-        graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:5,outputNode:8}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:2,outputNode:5}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:5,outputNode:8}).unwrap();
 
-        let res = graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:8,outputNode:2});
+        let res = graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:8,outputNode:2});
         assert_eq!(res, Err(GraphError::Cycle));
 
         let mut graph = super::Graph::new("".to_string());
@@ -491,22 +522,22 @@ mod tests{
         //8
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
 
-        graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:2,outputNode:5}).unwrap();
-        graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:5,outputNode:8}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:2,outputNode:5}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:5,outputNode:8}).unwrap();
 
 
         //11
         graph.add_node(Box::new(ImageInputNode::new(graph.get_user())));
-        graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:8,outputNode:11}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:8,outputNode:11}).unwrap();
 
 
         //13
         graph.add_node(Box::new(super::node::mathNode::MathNode::new()));
-        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:8,outputNode:13}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:2, outputIndex:0, inputNode:8,outputNode:13}).unwrap();
 
         //17
         graph.add_node(Box::new(super::node::mathNode::MathNode::new()));
-        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:5,outputNode:17}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:2, outputIndex:0, inputNode:5,outputNode:17}).unwrap();
 
         //21
         graph.add_node(Box::new(super::node::mathNode::MathNode::new()));
@@ -522,7 +553,7 @@ mod tests{
         assert_eq!(graph.edges[graph.edges.iter().position(|elem| elem.1 == super::Edge{inputIndex:0, outputIndex:0, inputNode:5,outputNode:8}).unwrap()].0, 2);
         assert_eq!(graph.edges[graph.edges.iter().position(|elem| elem.1 == super::Edge{inputIndex:1, outputIndex:0, inputNode:5,outputNode:17}).unwrap()].0, 3);
 
-        graph.remove_edge_and_replace_with_default(&super::Edge{inputIndex:1, outputIndex:0, inputNode:5,outputNode:17}, true).unwrap();
+        graph.remove_edge_and_replace_with_default(&super::Edge{inputIndex:2, outputIndex:0, inputNode:5,outputNode:17}, true).unwrap();
         assert_eq!(graph.edges.last().unwrap().0, 4);
         
     }

@@ -288,7 +288,6 @@ class UI{
 
       this.context.drawImage(this.background, centerShift_x,centerShift_y,this.background.width*ratio, this.background.height*ratio); 
 
-
       this.context.restore();
       if(this.drawLine!=null && processCall == 1){
         this.drawLine();
