@@ -6,13 +6,15 @@ extern crate lazy_static;
 
 use std::fs::File;
 
+use memory_stats::memory_stats;
+
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::{env, thread};
 use std::{fs, collections::HashMap,io::Write};
 use std::sync::{Arc, Mutex, RwLock};
 
-use sysinfo::System;
+
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -238,7 +240,7 @@ async fn load_graph(data: &web::Data<AppState>, claim :&LoginClaim)->Result<Grap
         return Err(LoadError::graphNotFound);
     }
     //username is guaranteed to be valid because it was found in the database
-    let mut loadedGraph = Graph::new(claim.username.clone());
+    let mut loadedGraph = Graph::new(&claim.username);
     match loadedGraph.execute_commands(match serde_json::from_str(&contents){Ok(val)=>val, Err(_)=>return Err(LoadError::graphNotValid)}){Ok(_)=>(),Err(_)=>return Err(LoadError::graphNotValid)};
     
     return Ok(loadedGraph);
@@ -293,7 +295,7 @@ async fn create_graph(request: HttpRequest,data: web::Data<AppState>,body:web::B
     let mut graphName = match String::from_utf8(body.to_vec()){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()};
     graphName = sanitize(&graphName);
 
-    let newGraph = Graph::new(claim.username.clone());
+    let newGraph = Graph::new(&claim.username);
 
 
     save_graph(&data, &graphName,&newGraph,&claim.username).await;
@@ -304,23 +306,17 @@ async fn create_graph(request: HttpRequest,data: web::Data<AppState>,body:web::B
 
 async fn load_cached_graph(claim:&LoginClaim,data:&web::Data<AppState>)->Result<Arc<Mutex<Graph>>,LoadError>{
 
-
-    let mut sys = System::new_all();
-
-    // First we update all information of our `System` struct.
-    sys.refresh_all();
-
-    println!("memory available: {}",sys.total_memory() as f64/(1024.0_f64).powi(3));
-    println!("memory used: {}",sys.used_memory() as f64/(1024.0_f64).powi(3));
-    println!("swap available: {}",sys.total_swap() as f64/(1024.0_f64).powi(3));
-    println!("swap used: {}",sys.used_swap() as f64/(1024.0_f64).powi(3));
-
-    //if our memory is low(<100 megabytes), we delete the cache
-    if ((sys.total_memory()+sys.total_swap())-(sys.used_memory()+sys.used_swap())) < 100*(1024_u64).pow(2){
+    {
         let mut graphs = data.graphs.write().unwrap();
-        graphs.clear();
+        if let Some(usage) = memory_stats() {
+            if usage.physical_mem > util::MEM_THRESHOLD.clone(){
+                println!("CLEARED GRAPH CACHE!!!");
+                graphs.clear();
+            }
+            println!("Current physical memory usage: {}", usage.physical_mem as f64/1024_f64.powi(2));
+            println!("Current virtual memory usage: {}", usage.virtual_mem as f64/1024_f64.powi(2));
+        }
     }
-
 
     //loads graph into cache on-demand
     let cacheKey = (claim.username.clone()+&claim.graphName);
@@ -472,6 +468,8 @@ async fn sites(_req: HttpRequest, info: web::Path<Info>) -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+
+
     if !Sqlite::database_exists(DB_URL).await.unwrap_or(false) {
         println!("Creating database {}", DB_URL);
         match Sqlite::create_database(DB_URL).await {

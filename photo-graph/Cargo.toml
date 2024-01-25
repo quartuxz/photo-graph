@@ -8,8 +8,10 @@ edition = "2021"
 [dependencies]
 macro-utils = {path = "../macro-utils"}
 
+
+dotenv = "0.15.0"
 #system
-sysinfo = "0.30.5"
+memory-stats = {version="1.1.0",features=["always_use_statm"]}
 #web
 actix-session = { version = "0.7.2", features = ["cookie-session"] }
 actix-web = "4"

@@ -1,10 +1,18 @@
 use std::fs;
+use dotenv::dotenv;
+use std::env;
 
+
+fn get_env_var(varName: &str)->String{
+    dotenv().ok();
+    env::var(varName).unwrap()
+}
 
 lazy_static!{
     pub static ref RESOURCE_PATH : String = "resources/".to_string();
     pub static ref SECRET : String = fs::read_to_string("secret.txt").unwrap();
-    pub static ref HOST : String = fs::read_to_string("host.txt").unwrap();
+    pub static ref HOST : String = get_env_var("HOST");
+    pub static ref MEM_THRESHOLD : usize = get_env_var("MEMORY_THRESHOLD").parse().unwrap();
 }
 
 pub fn sanitize(dirty:&str,isDir:bool)->String{

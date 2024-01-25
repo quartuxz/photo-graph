@@ -55,7 +55,8 @@ pub struct Graph{
     defaultInputEdges: HashMap<usize, Vec<Edge>>,
     commandHistory : Commands,
     user : String,
-    changedNodes: Vec<usize>
+    changedNodes: Vec<usize>,
+    lowMemoryMode:bool
 
 }
 
@@ -89,6 +90,26 @@ pub type GraphResult<T> = Result<T, GraphError>;
 
 impl Graph{
 
+    //creates a graph with low memory mode activated,
+    //low memory mode makes it so the graph clears buffers
+    //as it rolls through to process, meaning that
+    //the nodes that already contributed their part and are no longer
+    //needed to have their outputs buffered can have their
+    //buffers cleared.
+    //prefer low memory mode in enviroments where memory is at a premium
+    //or if processing particularly large graphs and/or images,
+    //using the normal mode is much faster.
+    pub fn new_low_memory_mode(user:&str)->Graph{
+        Graph{
+            lowMemoryMode:true,
+            ..Graph::new(user)
+        }
+    }
+
+    pub fn get_low_memory_mode(&self)->bool{
+        self.lowMemoryMode
+    }
+
     pub fn get_command_history(&self)->&Commands{
         &self.commandHistory
     }
@@ -119,12 +140,14 @@ impl Graph{
     }
     //very innefficient, thought about implementing recursively(would work) but stack overflow is a problem.
     fn clear_changed_buffers(&mut self){
-        for edge in &self.edges{
-            let connected_edges = self.get_edges_connnected_to(edge.1.outputNode);
+        //do some tricks for the borrow checker
+        let keys: Vec<usize> = self.nodes.keys().map(|key|{*key}).collect();
+        for node in keys{
+            let connected_edges = self.get_edges_connnected_to(node);
             for connected_edge in connected_edges{
                 for nodeID in &self.changedNodes{
                     if connected_edge.1.outputNode == *nodeID{
-                        self.nodes.get_mut(&nodeID).unwrap().clear_buffers();
+                        self.nodes.get_mut(&node).unwrap().clear_buffers();
                     }
                 }
             }
@@ -141,14 +164,19 @@ impl Graph{
     //processes the final bitmap output for a graph.
     pub fn process(&mut self)->GraphResult<RgbaImage>{
 
+        if !self.lowMemoryMode{
+            self.clear_changed_buffers();
+        }
 
-        self.clear_changed_buffers();
         
         let mut includes = true;
         let mut layer = 0;
         while includes {
             includes = false;
             for edge in self.get_edges_connnected_to(0){
+                if self.lowMemoryMode && layer > 0 && edge.0 == (layer-1){
+                    self.nodes.get_mut(&edge.1.outputNode).unwrap().clear_buffers();
+                }
                 if edge.0 == layer {
                     let val = match self.nodes.get_mut(&edge.1.outputNode){Some(val)=>val,None=> return Err(GraphError::NodeNotFound)}.get(edge.1.outputIndex)?;
                     match self.nodes.get_mut(&edge.1.inputNode){Some(val)=>val,None=> return Err(GraphError::NodeNotFound)}.set(edge.1.inputIndex, val)?;
@@ -164,6 +192,11 @@ impl Graph{
         
         if let node::NodeIOType::BitmapType(bitmap) =self.nodes.get_mut(&0).unwrap().get(0)?{
             self.changedNodes.clear();
+            if self.lowMemoryMode{
+                for node in &mut self.nodes{
+                    node.1.clear_buffers();
+                }
+            }
 
             Ok(bitmap)
         }else{
@@ -361,8 +394,8 @@ impl Graph{
         self.IDCount += index+1;
     }
 
-    pub fn new(user:String)->Self{
-        let mut graph=Graph { changedNodes:vec![], nodes : HashMap::new(), edges : vec![], defaultInputEdges : HashMap::new(), commandHistory: Commands::new(), IDCount:0, user};
+    pub fn new(user:&str)->Self{
+        let mut graph=Graph {lowMemoryMode:false, changedNodes:vec![], nodes : HashMap::new(), edges : vec![], defaultInputEdges : HashMap::new(), commandHistory: Commands::new(), IDCount:0, user: user.to_owned()};
         graph.add_node(Box::new(node::finalNode::FinalNode::new()));
         //graph.add_node(Box::new(node::imageInputNode::ImageInputNode::new()));
         //graph.add_edge(Edge{inputIndex:0,outputIndex:0,inputNode:0,outputNode:2}).unwrap();
@@ -445,13 +478,13 @@ mod tests{
 
     #[test]
     fn add_node_test(){
-        let mut graph = super::Graph::new("".to_string());
+        let mut graph = super::Graph::new("");
         graph.add_node(Box::new(ImageInputNode::new(graph.get_user())));
         assert_eq!(graph.edges[1].1, super::Edge{inputIndex:0,outputIndex:0,inputNode:2,outputNode:3});
     }
     #[test]
     fn simple_add_edge_test(){
-        let mut graph = super::Graph::new("".to_string());
+        let mut graph = super::Graph::new("");
         graph.add_node(Box::new(ImageInputNode::new(graph.get_user())));
         graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:0,outputNode:2}).unwrap();
         assert_eq!(graph.edges[1].1, super::Edge{inputIndex:0,outputIndex:0,inputNode:0,outputNode:2});
@@ -460,7 +493,7 @@ mod tests{
 
     #[test]
     fn remove_edge_test(){
-        let mut graph = super::Graph::new("".to_string());
+        let mut graph = super::Graph::new("");
         graph.add_node(Box::new(ImageInputNode::new(graph.get_user())));
         graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:0,outputNode:2}).unwrap();
         graph.remove_edge_and_replace_with_default(&super::Edge{inputIndex:0, outputIndex:0, inputNode:0,outputNode:2}, true).unwrap();
@@ -470,14 +503,14 @@ mod tests{
 
     #[test]
     fn simple_loop_check_test(){
-        let mut graph = super::Graph::new("".to_string());
+        let mut graph = super::Graph::new("");
         let res = graph.add_edge(super::Edge{inputIndex:0, outputIndex:0, inputNode:0,outputNode:0});
         assert_eq!(res, Err(GraphError::Cycle));
     }
 
     #[test]
     fn loop_check_test(){
-        let mut graph = super::Graph::new("".to_string());
+        let mut graph = super::Graph::new("");
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
@@ -487,7 +520,7 @@ mod tests{
         let res = graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:8,outputNode:2});
         assert_eq!(res, Err(GraphError::Cycle));
 
-        let mut graph = super::Graph::new("".to_string());
+        let mut graph = super::Graph::new("");
         //2
         graph.add_node(Box::new(super::node::colorToImageNode::ColorToImageNode::new()));
         //6
@@ -514,7 +547,7 @@ mod tests{
 
     #[test]
     fn add_remove_edge_test(){
-        let mut graph = super::Graph::new("".to_string());
+        let mut graph = super::Graph::new("");
         //2
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
         //5

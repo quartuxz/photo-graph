@@ -2,5 +2,6 @@
 .env
 host.txt
 secret.txt
+memory_available.txt
 resources/images/**
 sqlite.*
