@@ -313,8 +313,6 @@ async fn load_cached_graph(claim:&LoginClaim,data:&web::Data<AppState>)->Result<
                 println!("CLEARED GRAPH CACHE!!!");
                 graphs.clear();
             }
-            println!("Current physical memory usage: {}", usage.physical_mem as f64/1024_f64.powi(2));
-            println!("Current virtual memory usage: {}", usage.virtual_mem as f64/1024_f64.powi(2));
         }
     }
 

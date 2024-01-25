@@ -229,7 +229,7 @@ class UI{
     async process(){
       let precedence = ++this.currentProcessPrecedence;
       this.background = this.loadingImage;
-      this.draw(1);
+      this.draw();
       const options = {
         method: "POST"
       };
@@ -241,7 +241,7 @@ class UI{
         this.background = new Image();
         this.background.src=url;
         this.background.onload = ()=>{
-          this.draw(2);
+          this.draw();
         }
         
         document.getElementById("downloadButton").href=url;
@@ -273,7 +273,7 @@ class UI{
       this.draw();
     }
   
-    draw(processCall = 0){
+    draw(){
       this.context.save();
       this.context.setTransform(1,0,0,1,0,0);
       this.context.clearRect(0,0,this.canvas.width,this.canvas.height);
@@ -289,12 +289,9 @@ class UI{
       this.context.drawImage(this.background, centerShift_x,centerShift_y,this.background.width*ratio, this.background.height*ratio); 
 
       this.context.restore();
-      if(this.drawLine!=null && processCall == 1){
+
+      if(this.drawLine!= null){
         this.drawLine();
-      }
-      if(this.drawLine!=null && processCall == 2){
-        this.drawLine();
-        this.drawLine = null;
       }
   
       this.graph.draw(this.context);
@@ -343,6 +340,7 @@ class UI{
   
     async mouseUp(evt){
       //this.selecting = null;
+      this.drawLine = null;
       if(evt.button == 0){
         this.isLeftMouseDown =false;
         if(this.selecting != null){
@@ -355,6 +353,7 @@ class UI{
                 break;
               }
               if(pointed.type == type2 && pointed.node.id != this.selecting.node.id){
+
                 if(type1 == "output"){
                   this.graph.addLine(new Line(this.selecting.node.id,this.selecting.IOSocket,pointed.node.id,pointed.IOSocket), this.process.bind(this));
                 }else{
