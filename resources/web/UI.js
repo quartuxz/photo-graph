@@ -316,10 +316,10 @@ class UI{
         let txt = `CONTROLS: \n
                   CLICK ANYWHERE TO EXIT \n
                   DOUBLE-CLICK: creat node \n 
-                  DRAG LEFT MOUSE BUTTON: pan \n
+                  DRAG RIGHT MOUSE BUTTON: pan \n
                   SCROLL WHEEL: zoom\n
-                  CLICK RIGHT MOUSE BUTTON: select\n
-                  DRAG RIGHT MOUSE BUTTON: move node\n
+                  CLICK LEFT MOUSE BUTTON: select\n
+                  DRAG LEFT MOUSE BUTTON: move node\n
                   X: delete node`;
         let x = this.canvas.width*0.25;
         let y = this.canvas.height*0.25;
