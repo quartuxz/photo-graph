@@ -56,6 +56,11 @@ impl Node for ScaleNode{
     fn clear_buffers(&mut self) {
         *self = ScaleNode::new();
     }
+
+    fn clear_inputs(&mut self) {
+        self.scaling = RgbaImage::default();
+    }
+
     fn set(&mut self, index: u16, value: NodeIOType) -> NodeResult<()> {
         self.generate_input_errors(&index, &value)?;
         match index {

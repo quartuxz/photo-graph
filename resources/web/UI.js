@@ -290,12 +290,13 @@ class UI{
 
       this.context.restore();
 
-      if(this.drawLine!= null){
-        this.drawLine();
-      }
+
   
       this.graph.draw(this.context);
       this.contextMenu.draw();
+      if(this.drawLine!= null){
+        this.drawLine();
+      }
     }
   
     async mouseDown(evt){
@@ -424,7 +425,6 @@ class UI{
               this.context.stroke();
               this.context.restore();}
 
-              this.drawLine();
           }
 
         }

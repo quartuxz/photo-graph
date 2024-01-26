@@ -35,6 +35,10 @@ impl Node for FinalNode{
         *self=FinalNode::new();
     }
 
+    fn clear_inputs(&mut self) {
+        self.bitmap = RgbaImage::default();
+    }
+
     fn get(&mut self, index: u16) -> NodeResult<NodeIOType> {
         self.generate_output_errors(&index)?;
         if self.bitmap.is_empty(){

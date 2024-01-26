@@ -65,6 +65,10 @@ impl Node for BlendNode{
     fn clear_buffers(&mut self) {
         *self = BlendNode::new();
     }
+    fn clear_inputs(&mut self) {
+        self.background = RgbaImage::default();
+        self.foreground = RgbaImage::default();
+    }
     fn set(&mut self, index: u16, value: NodeIOType) -> NodeResult<()> {
         self.generate_input_errors(&index, &value)?;
         match index {

@@ -208,6 +208,10 @@ pub trait Node: Send + Sync + NodeDefaults + NodeStatic{
 
     }
 
+    fn clear_inputs(&mut self){
+
+    }
+
     fn get(&mut self, _index: u16) -> NodeResult<NodeIOType>{
         NodeResult::Err(NodeError::NoOutput(self.get_node_name()))
     }

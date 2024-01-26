@@ -52,6 +52,11 @@ impl Node for ResizeNode{
     fn clear_buffers(&mut self) {
         *self = ResizeNode::new();
     }
+
+    fn clear_inputs(&mut self) {
+        self.resizing = RgbaImage::default();
+    }
+
     fn set(&mut self, index: u16, value: NodeIOType) -> NodeResult<()> {
         self.generate_input_errors(&index, &value)?;
         match index {

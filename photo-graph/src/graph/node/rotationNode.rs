@@ -54,6 +54,10 @@ impl Node for RotationNode{
         *self = RotationNode::new();
     }
 
+    fn clear_inputs(&mut self) {
+        self.rotating = RgbaImage::default();
+    }
+
     fn set(&mut self, index: u16, value: NodeIOType) -> NodeResult<()> {
         self.generate_input_errors(&index, &value)?;
         match index {

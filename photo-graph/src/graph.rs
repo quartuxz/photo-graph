@@ -163,7 +163,7 @@ impl Graph{
 
     //processes the final bitmap output for a graph.
     pub fn process(&mut self)->GraphResult<RgbaImage>{
-
+        //we selectively clear buffers that were update or that lie downstream from a node that got updated.
         if !self.lowMemoryMode{
             self.clear_changed_buffers();
         }
@@ -192,9 +192,14 @@ impl Graph{
         
         if let node::NodeIOType::BitmapType(bitmap) =self.nodes.get_mut(&0).unwrap().get(0)?{
             self.changedNodes.clear();
+            //if we are in low memory mode, we clear all buffers as we wont be using them for optimized performance
             if self.lowMemoryMode{
                 for node in &mut self.nodes{
                     node.1.clear_buffers();
+                }
+            }else{//otherwise we just clear the inputs on the nodes, as they get repopulated in the next processing round.
+                for node in &mut self.nodes{
+                    node.1.clear_inputs();
                 }
             }
 
@@ -206,7 +211,7 @@ impl Graph{
 
     }
 
-
+    //checks if the edge in the graph combines with the rest of the graph to form a cycle
     fn check_for_cycle(&self, edge:&Edge)->bool{
         
 
@@ -237,7 +242,7 @@ impl Graph{
 
         return false;
     }
-
+    //recalculates the layers which indicate the order of execution for the nodes.
     fn recalculate_layers(&mut self){
         let mut distances : Vec<usize> = vec![];
         for edge in &self.edges {
@@ -270,7 +275,7 @@ impl Graph{
 
     }
 
-
+    //adds an edged to the graph,checking for cycles and undoing if necessary
     fn add_edge(&mut self, edge:Edge)->GraphResult<()>{
 
         //checks if the nodes have outputs/inputs at given indices
@@ -330,6 +335,7 @@ impl Graph{
         return GraphResult::Err(GraphError::EdgeNotFound);
     }
 
+    //removes a node, all of its connecting edges and its default nodes
     fn remove_node(&mut self, index: usize,recalculate :bool)->GraphResult<()>{
 
         if !self.nodes.contains_key(&index){
@@ -344,18 +350,24 @@ impl Graph{
             if index == currentEdge.outputNode{
                 self.remove_edge_and_replace_with_default(&currentEdge, false)?;
             }
-            //guaranteed to be an ascending index list
+
             if index == currentEdge.inputNode{
                 toRemove.push(i);
             }
         }
 
-        let mut removed = 0;
+        toRemove.sort();
+        let mut toRemoveIter = toRemove.iter().peekable();
 
-        for removing in toRemove{
-            self.edges.remove(removing-removed);
-            removed +=1;
-        }
+        //removes all input edges
+        self.edges= self.edges.iter().enumerate().filter_map(|elem| {
+            if toRemoveIter.peek().is_some() && elem.0 == **toRemoveIter.peek().unwrap(){
+                toRemoveIter.next();
+                return None;
+            }
+            Some(elem.1.clone())
+        }).collect();
+
         //remove default nodes associated
         if let Some(removedNode) = removedNodeO{
             for i in (index+1)..(removedNode.get_inputs().len()+index+1){
@@ -397,8 +409,6 @@ impl Graph{
     pub fn new(user:&str)->Self{
         let mut graph=Graph {lowMemoryMode:false, changedNodes:vec![], nodes : HashMap::new(), edges : vec![], defaultInputEdges : HashMap::new(), commandHistory: Commands::new(), IDCount:0, user: user.to_owned()};
         graph.add_node(Box::new(node::finalNode::FinalNode::new()));
-        //graph.add_node(Box::new(node::imageInputNode::ImageInputNode::new()));
-        //graph.add_edge(Edge{inputIndex:0,outputIndex:0,inputNode:0,outputNode:2}).unwrap();
         graph
     }
 
