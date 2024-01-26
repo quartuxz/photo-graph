@@ -171,6 +171,7 @@ class UI{
     contextMenu;
     background = new Image();
     loadingImage = new Image();
+    firstAction = true;
     drawLine = null;
     currentProcessPrecedence = 0;
   
@@ -197,6 +198,7 @@ class UI{
       this.process();
 
       this.draw();
+
     }
   
     #translate(dx,dy){
@@ -278,15 +280,17 @@ class UI{
       this.context.setTransform(1,0,0,1,0,0);
       this.context.clearRect(0,0,this.canvas.width,this.canvas.height);
       this.#drawTransparencyBackground();
-      //draw background image
+
       
       let hRatio = this.canvas.width  / this.background.width    ;
       let vRatio =  this.canvas.height / this.background.height  ;
       let ratio  = Math.min ( hRatio, vRatio );
       let centerShift_x = ( this.canvas.width - this.background.width*ratio ) / 2;
       let centerShift_y = ( this.canvas.height - this.background.height*ratio ) / 2; 
-
+      //draw background image
       this.context.drawImage(this.background, centerShift_x,centerShift_y,this.background.width*ratio, this.background.height*ratio); 
+
+
 
       this.context.restore();
 
@@ -297,9 +301,45 @@ class UI{
       if(this.drawLine!= null){
         this.drawLine();
       }
+
+      if(this.firstAction){
+        this.context.save();
+        this.context.setTransform(1,0,0,1,0,0);
+
+        
+        this.context.fillStyle = "rgba(10,10,10,0.75)";
+        this.context.fillRect(0,0,this.canvas.width,this.canvas.height);
+  
+  
+        this.context.fillStyle = "white";
+        this.context.font = "15px seif";
+        let txt = `CONTROLS: \n
+                  CLICK ANYWHERE TO EXIT \n
+                  DOUBLE-CLICK: creat node \n 
+                  DRAG LEFT MOUSE BUTTON: pan \n
+                  SCROLL WHEEL: zoom\n
+                  CLICK RIGHT MOUSE BUTTON: select\n
+                  DRAG RIGHT MOUSE BUTTON: move node\n
+                  X: delete node`;
+        let x = this.canvas.width*0.25;
+        let y = this.canvas.height*0.25;
+        let metrics = this.context.measureText(txt);
+        let lineheight = metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent;
+        let lines = txt.split('\n');
+
+        for (var i = 0; i<lines.length; i++)
+          this.context.fillText(lines[i], x, y + (i*lineheight) );
+        this.context.restore();
+      }
+ 
     }
   
     async mouseDown(evt){
+      if(this.firstAction){
+
+        this.draw();
+        this.firstAction =false;
+      }
       if(evt.button == 0){
         if (evt.detail > 1) {
           evt.preventDefault();
@@ -434,6 +474,11 @@ class UI{
     }
   
     wheel(evt){
+      if(this.firstAction){
+
+        this.draw();
+        this.firstAction =false;
+      }
       evt.preventDefault();
       // Normalize mouse wheel movement to +1 or -1 to avoid unusual jumps.
       const wheel = evt.deltaY < 0 ? 1 : -1;
@@ -465,6 +510,11 @@ class UI{
     }
   
     dblClick(evt){
+      if(this.firstAction){
+
+        this.draw();
+        this.firstAction =false;
+      }
       let mousePos = this.#getMousePos(evt);
       //let transform = context.getTransform().invertSelf();
       let transformed = this.graph.getTransformedPos(mousePos);
@@ -475,6 +525,11 @@ class UI{
     }
 
     keydown(evt){
+      if(this.firstAction){
+
+        this.draw();
+        this.firstAction =false;
+      }
       let code = evt.keyCode;
       switch(code){
         case 88: if(this.selecting != null && this.selecting.node.id != 0){this.changeContextMenu("default",null); this.graph.removeNode(this.selecting.node.id,this.process.bind(this))};
