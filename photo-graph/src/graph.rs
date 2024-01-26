@@ -174,14 +174,15 @@ impl Graph{
         while includes {
             includes = false;
             for edge in self.get_edges_connnected_to(0){
-                if self.lowMemoryMode && layer > 0 && edge.0 == (layer-1){
-                    self.nodes.get_mut(&edge.1.outputNode).unwrap().clear_buffers();
-                }
+                
                 if edge.0 == layer {
                     let val = match self.nodes.get_mut(&edge.1.outputNode){Some(val)=>val,None=> return Err(GraphError::NodeNotFound)}.get(edge.1.outputIndex)?;
                     match self.nodes.get_mut(&edge.1.inputNode){Some(val)=>val,None=> return Err(GraphError::NodeNotFound)}.set(edge.1.inputIndex, val)?;
-                    
+
                     includes = true;
+                    if self.lowMemoryMode && layer > 0{
+                        self.nodes.get_mut(&edge.1.outputNode).unwrap().clear_buffers();
+                    }
                 }
 
             }
@@ -461,7 +462,7 @@ impl Graph{
                             self.nodes.insert(nodeID, Box::new(node::stringLiteralNode::StringLiteralNode::new(cmd.args[2].clone())));
                         }
                         else if nodeName == node::colorLiteralNode::ColorLiteralNode::get_node_name_static(){
-                            if cmd.args.len() < 7{return Err(GraphError::IllFormedCommand)}
+                            if cmd.args.len() < 6{return Err(GraphError::IllFormedCommand)}
                             let mut channels : [u8;4] = [0;4];
                             for i in 0..4 {
                                 channels[i] = match cmd.args[i+2].parse(){
