@@ -1,4 +1,8 @@
+use std::cmp;
+
 use image::GenericImageView;
+
+use crate::image_utils::bilinear_interpolate;
 
 use super::*;
 
@@ -101,15 +105,12 @@ impl Node for MoveNode{
                     if self.moving.height() as i32 + roundedY <= 0{
                         return Err(NodeError::InvalidInput(Self::get_node_name_static(), NodeIOType::FloatType(self.y), 2))
                     }
-                    self.buffer = RgbaImage::from_fn(self.moving.width(),self.moving.height() , 
+                    self.buffer = RgbaImage::from_fn((self.moving.width() as i32+cmp::min(0, roundedX)) as u32,(self.moving.height() as i32+cmp::min(0, roundedY)) as u32 , 
                     |x,y|{
-                        let imageX = x as i32 - roundedX;
-                        let imageY = y as i32 - roundedY;
-                        if(imageX < 0 || imageY < 0 || imageX >= self.moving.width() as i32 || imageY >= self.moving.height() as i32){
-                            Rgba([0,0,0,0])
-                        }else{
-                            self.moving.get_pixel(imageX as u32, imageY as u32).clone()
-                        }
+                        let imageX = x as f64 - self.x;
+                        let imageY = y as f64 - self.y;
+                        
+                        bilinear_interpolate(&self.moving, imageX, imageY)
                     
                     });
                 },
@@ -122,23 +123,19 @@ impl Node for MoveNode{
                     }
                     self.buffer = RgbaImage::from_fn((self.moving.width() as i32 +roundedX) as u32,(self.moving.height()as i32 +roundedY) as u32, 
                     |x,y|{
-                        let imageX = x as i32 - roundedX;
-                        let imageY = y as i32 - roundedY;
-                        if(imageX < 0 || imageY < 0 || imageX >= self.moving.width() as i32 || imageY >= self.moving.height() as i32){
-                            Rgba([0,0,0,0])
-                        }else{
-                            self.moving.get_pixel(imageX as u32, imageY as u32).clone()
-                        }
+                        let imageX = x as f64 - self.x;
+                        let imageY = y as f64 - self.y;
+                        bilinear_interpolate(&self.moving, imageX, imageY)
                     
                     });
                 },
                 MoveMode::wrap=>{
                     self.buffer = RgbaImage::from_fn(self.moving.width(),self.moving.height(), 
                     |x,y|{
-                        let imageX = (x as i32 + roundedX).rem_euclid(self.moving.width()as i32) ;
-                        let imageY = (y as i32 + roundedY).rem_euclid(self.moving.height()as i32) ;
+                        let imageX = (x as f64 - self.x).rem_euclid(self.moving.width()as f64) ;
+                        let imageY = (y as f64 - self.y).rem_euclid(self.moving.height()as f64) ;
                         
-                        self.moving.get_pixel(imageX as u32, imageY as u32).clone()
+                        bilinear_interpolate(&self.moving, imageX, imageY)
                     
                     });
                 }

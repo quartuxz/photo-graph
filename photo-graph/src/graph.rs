@@ -180,11 +180,21 @@ impl Graph{
                     match self.nodes.get_mut(&edge.1.inputNode){Some(val)=>val,None=> return Err(GraphError::NodeNotFound)}.set(edge.1.inputIndex, val)?;
 
                     includes = true;
-                    if self.lowMemoryMode && layer > 0{
-                        self.nodes.get_mut(&edge.1.outputNode).unwrap().clear_buffers();
-                    }
+                    
                 }
 
+            }
+            for edge in self.get_edges_connnected_to(0){
+                if edge.0 == layer {
+                    //we roll through the nodes that have already been processes and whose result is already used.
+                    //Clearing buffers or inputs.
+                    if self.lowMemoryMode{
+                        self.nodes.get_mut(&edge.1.outputNode).unwrap().clear_buffers();
+                    }else{
+                        self.nodes.get_mut(&edge.1.outputNode).unwrap().clear_inputs();
+                    }
+
+                }
             }
             layer+=1;
         }
