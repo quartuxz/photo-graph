@@ -150,7 +150,7 @@ pub enum NodeError{
 pub type NodeResult<T> = result::Result<T, NodeError>;
 
 
-pub trait NodeStatic: Send + Sync{
+pub trait NodeStatic: Send{
     fn get_inputs_static()->Vec<NodeInputOptions> where
     Self:Sized
     {
@@ -173,7 +173,7 @@ pub trait NodeStatic: Send + Sync{
 }
 
 
-pub trait NodeDefaults: Send+Sync{
+pub trait NodeDefaults: Send{
     fn get_outputs(&self)->Vec<NodeOutputOptions>;
 
     //return all the node's inputs, the NodeIOType enum must contain the default input for the given index
@@ -183,7 +183,7 @@ pub trait NodeDefaults: Send+Sync{
 }
 
 //all fields in implementors that are set with the set method are expected to be repopulated after every processing run.
-pub trait Node: Send + Sync + NodeDefaults + NodeStatic{
+pub trait Node: Send + NodeDefaults + NodeStatic{
     
     fn generate_output_errors(&self, index:&u16)->NodeResult<()>{
         if self.get_outputs().len() < (*index as usize) {

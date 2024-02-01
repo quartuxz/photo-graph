@@ -4,13 +4,14 @@ mod image_utils;
 #[macro_use]
 extern crate lazy_static;
 
+use std::collections::btree_map::Range;
 use std::fs::File;
 
 use memory_stats::memory_stats;
 
 use std::io::Cursor;
 use std::path::PathBuf;
-use std::{env, thread};
+use std::{env, mem, thread};
 use std::{fs, collections::HashMap,io::Write};
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -467,6 +468,7 @@ async fn sites(_req: HttpRequest, info: web::Path<Info>) -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+
 
 
     if !Sqlite::database_exists(DB_URL).await.unwrap_or(false) {
