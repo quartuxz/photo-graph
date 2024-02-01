@@ -94,8 +94,8 @@ impl Node for MoveNode{
     fn get(&mut self, index: u16) -> NodeResult<NodeIOType> {
         self.generate_output_errors(&index)?;
         if !self.buffered {
-            let roundedX = self.x.round() as i32;
-            let roundedY = self.y.round() as i32;
+            let roundedX = self.x.ceil() as i32;
+            let roundedY = self.y.ceil() as i32;
 
             match self.mode{
                 MoveMode::clamp=>{

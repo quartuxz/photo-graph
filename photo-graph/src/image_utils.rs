@@ -2,18 +2,7 @@ use image::{GenericImageView, Pixel, Rgba, RgbaImage};
 
 
 pub fn bilinear_interpolate(image:&RgbaImage,x:f64,y:f64)->Rgba<u8>{
-    if x < 0.0 || y < 0.0 || x > image.width() as f64 || y > image.height() as f64 {
-        return Rgba([0,0,0,0]);
-    } 
 
-    //account for corners points that should yield the color of the corner pixel
-    if (x <= 0.5 && y <= 0.5) ||
-    (x <= 0.5 && (y - (image.height() as f64-1.0)) >= 0.5) ||
-    ((x - (image.width() as f64-1.0)) >= 0.5 && y <= 0.5) ||
-    ((x - (image.width() as f64-1.0)) >= 0.5 && (y - (image.height() as f64-1.0)) >= 0.5)
-    {
-        return image.get_pixel(x.floor() as u32, y.floor() as u32).clone();
-    }
 
     let mut four_near : [(&Rgba<u8>,(f64,f64));4] = [(&Rgba([0,0,0,0]),(0.0,0.0));4];
 
@@ -28,23 +17,7 @@ pub fn bilinear_interpolate(image:&RgbaImage,x:f64,y:f64)->Rgba<u8>{
         }
     }
 
-    //make the edge positions mix with the last pixels on those rows/columns instead of with transparency outside the image.
-    if x <= 0.5{
-        four_near[0].0 = four_near[1].0;
-        four_near[2].0 = four_near[3].0;
-    }
-    else if (x - (image.width() as f64-1.0)) >= 0.5{
-        four_near[1].0 = four_near[0].0;
-        four_near[3].0 = four_near[2].0;
-    }
-    if y <= 0.5{
-        four_near[0].0 = four_near[2].0;
-        four_near[1].0 = four_near[3].0;
-    }
-    else if (y - (image.height() as f64-1.0)) >= 0.5{
-        four_near[2].0 = four_near[0].0;
-        four_near[3].0 = four_near[1].0;
-    }
+
 
     //do the bilinear interpolation
     let near01To02 = saturating_add_rgba(&multiply_color(four_near[0].0, ((four_near[1].1.0-x)/(four_near[1].1.0-four_near[0].1.0)) as f32),

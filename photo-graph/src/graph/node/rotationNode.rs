@@ -106,11 +106,13 @@ impl Node for RotationNode{
             }
 
 
-            
+            let newWidth = (maxX-minX).ceil() as u32;
+            let newHeight = (maxY-minY).ceil() as u32;
+
             self.angle = -self.angle;
             match self.mode{
                 RotationMode::precise =>{
-                    self.buffer = RgbaImage::from_fn((maxX-minX).ceil() as u32, (maxY-minY).ceil() as u32, |x,y|{
+                    self.buffer = RgbaImage::from_fn(newWidth, newHeight, |x,y|{
                         let mut rotX = (((x as f64)+0.5)-halfWidth+minX)*self.angle.cos()-(((y as f64)+0.5)-halfHeight+minY)*self.angle.sin();
                         let mut rotY = (((x as f64)+0.5)-halfWidth+minX)*self.angle.sin()+(((y as f64)+0.5)-halfHeight+minY)*self.angle.cos();
                         rotX += halfWidth;
@@ -121,7 +123,7 @@ impl Node for RotationNode{
                     });
                 }
                 RotationMode::fast => {
-                    self.buffer = RgbaImage::from_fn((maxX-minX).ceil() as u32, (maxY-minY).ceil() as u32, |x,y|{
+                    self.buffer = RgbaImage::from_fn(newWidth, newHeight, |x,y|{
                         let mut rotX = ((x as f64)-halfWidth+minX)*self.angle.cos()-((y as f64)-halfHeight+minY)*self.angle.sin();
                         let mut rotY = ((x as f64)-halfWidth+minX)*self.angle.sin()+((y as f64)-halfHeight+minY)*self.angle.cos();
                         rotX += halfWidth;
