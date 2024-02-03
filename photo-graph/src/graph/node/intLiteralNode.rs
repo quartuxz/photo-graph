@@ -15,7 +15,7 @@ impl IntLiteralNode{
 
 impl NodeStatic for IntLiteralNode{
     fn get_outputs_static()->Vec<NodeOutputOptions>{
-        vec![NodeOutputOptions{IOType:NodeIOType::IntType(i64::default()), hasConnection:true, name:"".to_string()}]
+        vec![NodeOutputOptions{IOType:NodeIOType::IntType(i64::default()), hasConnection:true, name:"".to_string(),subtype:None}]
     }
     fn get_node_name_static()->String {
         "Integer literal".to_string()

@@ -12,10 +12,10 @@ enum ScaleMode{
 
 pub struct ScaleNode{
     mode : ScaleMode,
-    scaling : RgbaImage,
+    scaling : Arc<DynamicImage>,
     x : f64,
     y: f64,
-    buffer : RgbaImage,
+    buffer : Arc<DynamicImage>,
     buffered:bool
 }
 
@@ -23,7 +23,7 @@ pub struct ScaleNode{
 
 impl ScaleNode{
     pub fn new()->Self{
-        ScaleNode {mode:ScaleMode::fast,scaling : RgbaImage::default(),x:0.0,y:0.0, buffer: RgbaImage::default(), buffered: false }
+        ScaleNode {mode:ScaleMode::fast,scaling : Arc::new(DynamicImage::default()),x:0.0,y:0.0, buffer: Arc::new(DynamicImage::default()), buffered: false }
     }
 
 
@@ -38,13 +38,13 @@ impl NodeStatic for ScaleNode{
         presetValues.push("precise".to_string());
         vec![
             NodeInputOptions{name:"mode".to_string(),IOType:NodeIOType::IntType(0),canAlterDefault:true,hasConnection:false,presetValues:Some(presetValues),subtype:None},
-            NodeInputOptions{name:"scaling".to_string(),IOType:NodeIOType::BitmapType(RgbaImage::default()),canAlterDefault:false,hasConnection:true,presetValues:None,subtype:None},
+            NodeInputOptions{name:"scaling".to_string(),IOType:NodeIOType::DynamicImageType(Arc::new(DynamicImage::default())),canAlterDefault:false,hasConnection:true,presetValues:None,subtype:None},
             NodeInputOptions{name:"x".to_string(),IOType:NodeIOType::FloatType(1.0),canAlterDefault:true,hasConnection:true,presetValues:None,subtype:None},
             NodeInputOptions{name:"y".to_string(),IOType:NodeIOType::FloatType(1.0),canAlterDefault:true,hasConnection:true,presetValues:None,subtype:None},]
     }
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{
-        vec![NodeOutputOptions{name:"Scaled".to_string(),IOType:NodeIOType::BitmapType(RgbaImage::default()),hasConnection:true}]
+        vec![NodeOutputOptions{name:"Scaled".to_string(),IOType:NodeIOType::DynamicImageType(Arc::default()),hasConnection:true,subtype:None}]
     }
 
     fn get_node_name_static()->String {
@@ -57,9 +57,7 @@ impl Node for ScaleNode{
         *self = ScaleNode::new();
     }
 
-    fn clear_inputs(&mut self) {
-        self.scaling = RgbaImage::default();
-    }
+
 
     fn set(&mut self, index: u16, value: NodeIOType) -> NodeResult<()> {
         self.generate_input_errors(&index, &value)?;
@@ -70,7 +68,7 @@ impl Node for ScaleNode{
                     Err(_)=> return Err(NodeError::InvalidInput(Self::get_node_name_static(), value, index))
                 };
             },
-            1 => if let NodeIOType::BitmapType(image) = value{
+            1 => if let NodeIOType::DynamicImageType(image) = value{
                 self.scaling = image;
             }
             2 => if let NodeIOType::FloatType(x) = value{
@@ -96,21 +94,22 @@ impl Node for ScaleNode{
 
     fn get(&mut self, index: u16) -> NodeResult<NodeIOType> {
         self.generate_output_errors(&index)?;
-        if !self.buffered {            
+        if !self.buffered {   
+            let scaling = self.scaling.to_rgba8();         
             match self.mode{
-                ScaleMode::fast => self.buffer = RgbaImage::from_fn((self.scaling.width() as f64*self.x).ceil() as u32, (self.scaling.height() as f64*self.y).ceil() as u32, |x,y|{
+                ScaleMode::fast => *Arc::get_mut(&mut self.buffer).unwrap() = DynamicImage::ImageRgba8(RgbaImage::from_fn((self.scaling.width() as f64*self.x).ceil() as u32, (self.scaling.height() as f64*self.y).ceil() as u32, |x,y|{
                     let ax = x as f64 * self.x.recip();
                     let ay = y as f64 * self.y.recip();
-                    match self.scaling.get_pixel_checked(ax.round() as u32, ay.round() as u32){
+                    match scaling.get_pixel_checked(ax.round() as u32, ay.round() as u32){
                         Some(val)=>val.clone(),
                         None => Rgba([0,0,0,0])
                     }
-                }),
-                ScaleMode::precise => self.buffer = RgbaImage::from_fn((self.scaling.width() as f64*self.x).ceil() as u32, (self.scaling.height() as f64*self.y).ceil() as u32, |x,y|{
+                })),
+                ScaleMode::precise => *Arc::get_mut(&mut self.buffer).unwrap() = DynamicImage::ImageRgba8(RgbaImage::from_fn((self.scaling.width() as f64*self.x).ceil() as u32, (self.scaling.height() as f64*self.y).ceil() as u32, |x,y|{
                     let ax = (x as f64+0.5) * self.x.recip();
                     let ay = (y as f64+0.5) * self.y.recip();
-                    bilinear_interpolate(&self.scaling, ax, ay)
-                })
+                    bilinear_interpolate(&scaling, ax, ay)
+                }))
             }
             
             
@@ -119,6 +118,6 @@ impl Node for ScaleNode{
         }
 
 
-        NodeResult::Ok(NodeIOType::BitmapType(self.buffer.clone()))
+        NodeResult::Ok(NodeIOType::DynamicImageType(self.buffer.clone()))
     }
 }

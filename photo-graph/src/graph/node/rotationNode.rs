@@ -9,20 +9,21 @@ use super::*;
 #[conversion_type(i64)]
 enum RotationMode{
     fast,
-    precise
+    precise,
+    inPlace
 }
 
 pub struct RotationNode{
     mode: RotationMode,
-    rotating:RgbaImage,
+    rotating:Arc<DynamicImage>,
     angle:f64,
-    buffer:RgbaImage,
+    buffer:Arc<DynamicImage>,
     buffered:bool
 }
 
 impl RotationNode{
     pub fn new()->Self{
-        RotationNode { mode: RotationMode::fast,rotating: RgbaImage::default(), angle: 0.0, buffered: false, buffer:RgbaImage::default() }
+        RotationNode { mode: RotationMode::fast,rotating: Arc::new(DynamicImage::default()), angle: 0.0, buffered: false, buffer:Arc::new(DynamicImage::default()) }
     }
 
 }
@@ -32,14 +33,15 @@ impl NodeStatic for RotationNode{
         let mut presetValues = vec![];
         presetValues.push("fast".to_string());
         presetValues.push("precise".to_string());
+        presetValues.push("in-place".to_string());
         vec![
             NodeInputOptions{name:"mode".to_string(),IOType:NodeIOType::IntType(0),canAlterDefault:true,hasConnection:false,presetValues:Some(presetValues),subtype:None},
-            NodeInputOptions{name:"rotating".to_string(),IOType: NodeIOType::BitmapType(RgbaImage::default()),canAlterDefault:false,hasConnection:true, presetValues:None,subtype:None},
+            NodeInputOptions{name:"rotating".to_string(),IOType: NodeIOType::DynamicImageType(Arc::new(DynamicImage::default())),canAlterDefault:false,hasConnection:true, presetValues:None,subtype:None},
             NodeInputOptions{name: "angle".to_string(),IOType: NodeIOType::FloatType(0.0),canAlterDefault:true,hasConnection:true, presetValues:None,subtype:None}]
     }
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{
-        vec![NodeOutputOptions{name: "rotated".to_string(), IOType: NodeIOType::BitmapType(RgbaImage::default()), hasConnection:true}]
+        vec![NodeOutputOptions{name: "rotated".to_string(), IOType: NodeIOType::DynamicImageType(Arc::default()), hasConnection:true,subtype:None}]
     }
 
     fn get_node_name_static()->String {
@@ -54,9 +56,6 @@ impl Node for RotationNode{
         *self = RotationNode::new();
     }
 
-    fn clear_inputs(&mut self) {
-        self.rotating = RgbaImage::default();
-    }
 
     fn set(&mut self, index: u16, value: NodeIOType) -> NodeResult<()> {
         self.generate_input_errors(&index, &value)?;
@@ -67,7 +66,7 @@ impl Node for RotationNode{
                     Err(_)=> return Err(NodeError::InvalidInput(Self::get_node_name_static(), value, index))
                 };
             },
-            1 => if let NodeIOType::BitmapType(image) = value{
+            1 => if let NodeIOType::DynamicImageType(image) = value{
                 self.rotating = image;
             },
             2 => if let NodeIOType::FloatType(angle) = value{
@@ -89,10 +88,10 @@ impl Node for RotationNode{
             let mut minY = f64::MAX; 
             let mut maxX = f64::MIN;
             let mut maxY = f64::MIN;
-            
+            let rotating = self.rotating.to_rgba8();
             let halfWidth = self.rotating.width() as f64/2.0;
             let halfHeight = self.rotating.height() as f64/2.0;
-            for (x,y,pix) in self.rotating.enumerate_pixels(){
+            for (x,y,pix) in rotating.enumerate_pixels(){
                 if pix.0[3] != 0{
                     let mut rotX = ((x as f64)-halfWidth)*self.angle.cos()-((y as f64)-halfHeight)*self.angle.sin();
                     let mut rotY = ((x as f64)-halfWidth)*self.angle.sin()+((y as f64)-halfHeight)*self.angle.cos();
@@ -112,31 +111,43 @@ impl Node for RotationNode{
             self.angle = -self.angle;
             match self.mode{
                 RotationMode::precise =>{
-                    self.buffer = RgbaImage::from_fn(newWidth, newHeight, |x,y|{
+                    *Arc::get_mut(&mut self.buffer).unwrap() = DynamicImage::ImageRgba8(RgbaImage::from_fn(newWidth, newHeight, |x,y|{
                         let mut rotX = (((x as f64)+0.5)-halfWidth+minX)*self.angle.cos()-(((y as f64)+0.5)-halfHeight+minY)*self.angle.sin();
                         let mut rotY = (((x as f64)+0.5)-halfWidth+minX)*self.angle.sin()+(((y as f64)+0.5)-halfHeight+minY)*self.angle.cos();
                         rotX += halfWidth;
                         rotY += halfHeight;
                         
-                        bilinear_interpolate(&self.rotating, rotX, rotY)
+                        bilinear_interpolate(&rotating, rotX, rotY)
                         
-                    });
+                    }));
                 }
                 RotationMode::fast => {
-                    self.buffer = RgbaImage::from_fn(newWidth, newHeight, |x,y|{
-                        let mut rotX = ((x as f64)-halfWidth+minX)*self.angle.cos()-((y as f64)-halfHeight+minY)*self.angle.sin();
-                        let mut rotY = ((x as f64)-halfWidth+minX)*self.angle.sin()+((y as f64)-halfHeight+minY)*self.angle.cos();
+                    *Arc::get_mut(&mut self.buffer).unwrap() = DynamicImage::ImageRgba8(RgbaImage::from_fn(newWidth, newHeight, |x,y|{
+                        let mut rotX = ((x as f64+0.5)-halfWidth+minX)*self.angle.cos()-((y as f64)-halfHeight+minY)*self.angle.sin();
+                        let mut rotY = ((x as f64+0.5)-halfWidth+minX)*self.angle.sin()+((y as f64)-halfHeight+minY)*self.angle.cos();
                         rotX += halfWidth;
                         rotY += halfHeight;
                         
-                        match self.rotating.get_pixel_checked((rotX.round()) as u32, (rotY.round()) as u32){
+                        match rotating.get_pixel_checked((rotX.floor()) as u32, (rotY.floor()) as u32){
                             Some(val) if rotX>0.0 && rotY >0.0=> val.clone(),
                             Some(_) => Rgba([0,0,0,0]),
                             None => Rgba([0,0,0,0])
                         }
                             
-                    });
+                    }));
                 }
+                RotationMode::inPlace =>{
+                    *Arc::get_mut(&mut self.buffer).unwrap() = DynamicImage::ImageRgba8(RgbaImage::from_fn(self.rotating.width(), self.rotating.height(), |x,y|{
+                        let mut rotX = (((x as f64)+0.5)-halfWidth)*self.angle.cos()-(((y as f64)+0.5)-halfHeight)*self.angle.sin();
+                        let mut rotY = (((x as f64)+0.5)-halfWidth)*self.angle.sin()+(((y as f64)+0.5)-halfHeight)*self.angle.cos();
+                        rotX += halfWidth;
+                        rotY += halfHeight;
+                        
+                        bilinear_interpolate(&rotating, rotX, rotY)
+                        
+                    }));
+                }
+                
             }
 
             self.angle = -self.angle;
@@ -146,7 +157,7 @@ impl Node for RotationNode{
         }
 
 
-        NodeResult::Ok(NodeIOType::BitmapType(self.buffer.clone()))
+        NodeResult::Ok(NodeIOType::DynamicImageType(self.buffer.clone()))
     }
 
 

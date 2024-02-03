@@ -1,6 +1,5 @@
 pub mod imageInputNode;
 pub mod finalNode;
-pub mod bitmapLiteralNode;
 pub mod stringLiteralNode;
 pub mod intLiteralNode;
 pub mod floatLiteralNode;
@@ -13,17 +12,25 @@ pub mod blendNode;
 pub mod moveNode;
 pub mod resizeNode;
 pub mod scaleNode;
+pub mod lumaToGrayscaleNode;
+pub mod lumaLiteralNode;
+pub mod dynamicImageLiteralNode;
+pub mod overlayWithMaskNode;
+pub mod separateRGBANode;
+pub mod invertNode;
 
-use std::{vec, result, fmt};
+use std::{fmt, result, sync::{Arc, RwLock}, vec};
 use serde::{Serialize, Serializer, ser::SerializeStruct};
 use thiserror::Error;
-use image::{RgbaImage, Rgba};
+use image::{DynamicImage, GrayImage, Luma, RgbImage, Rgba, RgbaImage};
 
 
 #[derive(Serialize)]
 pub enum NodeIOSubtypes{
     ColorCurves,
-    FilePath
+    FilePath,
+    GrayscaleImage,
+    ColorImage
 }
 
 pub struct NodeInputOptions{
@@ -38,7 +45,8 @@ pub struct NodeInputOptions{
 pub struct NodeOutputOptions{
     pub IOType : NodeIOType,
     pub hasConnection:bool,
-    pub name : String
+    pub name : String,
+    pub subtype: Option<NodeIOSubtypes>
 }
 
 
@@ -51,7 +59,8 @@ impl Serialize for NodeInputOptions{
         let IOType = match &self.IOType{
             NodeIOType::IntType(val) =>{ state.serialize_field("defaultValue", &val)?; "int"},
             NodeIOType::FloatType(val) => { state.serialize_field("defaultValue", &val)?; "float"},
-            NodeIOType::BitmapType(_) => { state.serialize_field("defaultValue", &Option::<()>::None)?; "bitmap"},
+            NodeIOType::DynamicImageType(_) => { state.serialize_field("defaultValue", &Option::<()>::None)?; "dynamic"},
+            NodeIOType::LumaType(val) => { state.serialize_field("defaultValue", &val.0[0])?; "luma"},
             NodeIOType::ColorType(val) => { state.serialize_field("defaultValue", &val.0)?; "color"},
             NodeIOType::StringType(val) => { state.serialize_field("defaultValue", &val)?; "string"},
         
@@ -75,13 +84,15 @@ impl Serialize for NodeOutputOptions{
         state.serialize_field("IOType", match self.IOType{
             NodeIOType::IntType(_) => "int",
             NodeIOType::FloatType(_) => "float",
-            NodeIOType::BitmapType(_) => "bitmap",
+            NodeIOType::DynamicImageType(_) => "dynamic",
+            NodeIOType::LumaType(_) =>  "luma",
             NodeIOType::ColorType(_) => "color",
             NodeIOType::StringType(_) => "string",
 
         })?;
         state.serialize_field("hasConnection", &self.hasConnection)?;
         state.serialize_field("name", &self.name)?;
+        state.serialize_field("subtype", &self.subtype);
         state.end()
     }
 }
@@ -94,13 +105,20 @@ pub struct NodeDescriptor{
 }
 
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub enum NodeIOType{
     IntType(i64),
     FloatType(f64),
-    BitmapType(RgbaImage),
+    DynamicImageType(Arc<DynamicImage>),
+    LumaType(Luma<u8>),
     ColorType(Rgba<u8>),
     StringType(String)
+}
+
+impl PartialEq for NodeIOType{
+    fn eq(&self, other: &Self) -> bool {
+        std::mem::discriminant(self) == std::mem::discriminant(other)
+    }
 }
 
 impl fmt::Display for NodeIOType{
@@ -108,7 +126,8 @@ impl fmt::Display for NodeIOType{
         
         match *self{
             NodeIOType::IntType(_) => write!(f, "int"),
-            NodeIOType::BitmapType(_) => write!(f, "bitmap"),
+            NodeIOType::DynamicImageType(_) => write!(f, "dynamic"),
+            NodeIOType::LumaType(_) => write!(f, "luma"),
             NodeIOType::ColorType(_) => write!(f, "color"),
             NodeIOType::FloatType(_)=> write!(f, "float"),
             NodeIOType::StringType(_)=> write!(f, "string")
@@ -122,8 +141,9 @@ impl fmt::Debug for NodeIOType{
         
         match *self{
             NodeIOType::IntType(_) => write!(f, "int"),
-            NodeIOType::BitmapType(_) => write!(f, "bitmap"),
+            NodeIOType::DynamicImageType(_) => write!(f, "dynamic"),
             NodeIOType::ColorType(_) => write!(f, "color"),
+            NodeIOType::LumaType(_) => write!(f, "luma"),
             NodeIOType::FloatType(_)=> write!(f, "float"),
             NodeIOType::StringType(_)=> write!(f, "string")
         }
@@ -194,10 +214,13 @@ pub trait Node: Send + NodeDefaults + NodeStatic{
 
     fn generate_input_errors(&self, index:&u16, value:&NodeIOType)->NodeResult<()>{
         if self.get_inputs().len() < (*index as usize) {
-            return NodeResult::Err(NodeError::InvalidInput(self.get_node_name(), value.clone(), *index));
+            return NodeResult::Err(NodeError::InvalidInputIndex(self.get_node_name(), *index));
         }
         if std::mem::discriminant(value) != std::mem::discriminant(&self.get_inputs()[*index as usize].IOType){
+            //check if we are connecting grayscale or rgba images to a dynamic image which is allowed.
+            
             return NodeResult::Err(NodeError::InvalidInput(self.get_node_name(), value.clone(), *index));
+
         }
         return NodeResult::Ok(())
     }
@@ -208,9 +231,6 @@ pub trait Node: Send + NodeDefaults + NodeStatic{
 
     }
 
-    fn clear_inputs(&mut self){
-
-    }
 
     fn get(&mut self, _index: u16) -> NodeResult<NodeIOType>{
         NodeResult::Err(NodeError::NoOutput(self.get_node_name()))

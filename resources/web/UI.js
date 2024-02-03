@@ -53,7 +53,7 @@ class ContextMenu{
           isEditable = true;
 
           let value = parameter.defaultValues[i];
-          if(inode.IOType == "bitmap"){
+          if(inode.IOType == "dynamic"){
             continue;
           }
           if(this.ui.graph.getLineByInput(parameter.id,i)!= null){
@@ -65,7 +65,12 @@ class ContextMenu{
             contents += "<input type=\"color\" id=\""+inode.name+"\" name=\""+inode.name+"\" value=\""+RGBToHexadecimal(value[0],value[1],value[2])+"\"></input> <br>";
             contents += "<label for=\"alpha\">alpha:</label> <br>";
             contents += "<input type=\"text\" id=\"alpha\" name=\"alpha\" value=\""+value[3]+"\"></input> <br>";
-          }else if(inode.presetValues != null){
+          }else if(inode.IOType == "luma"){
+            contents += "<label for=\""+ inode.name +"\">"+inode.name+"</label> <br>";
+            contents += "<input type=\"range\" min=\"0\" max=\"255\" id=\""+inode.name+"\" name=\""+inode.name+"\" value=\""+value+"\"></input> <br>";
+            contents += "<span id=\""+inode.name+"_value"+"\">"+value+"</span><br>";
+          }
+          else if(inode.presetValues != null){
             contents += inode.name+":<br>";
             contents+= "<select id=\""+inode.name+"\">";
             for(let o = 0; o < inode.presetValues.length;o++){
@@ -92,6 +97,17 @@ class ContextMenu{
       contents += "<button id=\"deleteButton\">delete</button>";
       document.getElementById("contextInner").innerHTML = contents;
       document.getElementById("manipulateForm").onsubmit = () => {this.onSubmitManipulate(); return false;};
+
+      for(let i = 0; i < parameter.template.inputNodes.length;i++){
+        const inode = parameter.template.inputNodes[i];
+        if(inode.canAlterDefault){
+          if(inode.IOType == "luma"){
+            document.getElementById(inode.name).oninput = () => {document.getElementById(inode.name+"_value").innerHTML = document.getElementById(inode.name).value;};
+            
+          }
+        }
+        
+      }
       document.getElementById("deleteButton").onclick = () =>{this.ui.changeContextMenu("default",null); this.ui.graph.removeNode(this.selected.id,this.ui.process.bind(this.ui))};
 
 
@@ -113,7 +129,7 @@ class ContextMenu{
 
   onSubmitManipulate(){
     for(const inode of this.selected.template.inputNodes){
-      if(this.nodeProperties.get(inode.name).hasConnection || inode.IOType == "bitmap"){
+      if(this.nodeProperties.get(inode.name).hasConnection || inode.IOType == "dynamic"){
         continue;
       }
       else if(inode.IOType == "color"){

@@ -32,7 +32,7 @@ impl NodeStatic for MathNode{
     }
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{
-        vec![NodeOutputOptions{name:"result".to_string(),IOType:NodeIOType::FloatType(f64::default()),hasConnection:true}]
+        vec![NodeOutputOptions{name:"result".to_string(),IOType:NodeIOType::FloatType(f64::default()),hasConnection:true,subtype:None}]
     }
 
     fn get_node_name_static()->String {

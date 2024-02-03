@@ -18,9 +18,9 @@ enum BlendMode{
 
 pub struct BlendNode{
     operation:BlendMode,
-    buffer : RgbaImage,
-    foreground : RgbaImage,
-    background : RgbaImage,
+    buffer : Arc<DynamicImage>,
+    foreground : Arc<DynamicImage>,
+    background : Arc<DynamicImage>,
     buffered:bool
 }
 
@@ -28,7 +28,7 @@ pub struct BlendNode{
 
 impl BlendNode{
     pub fn new()->Self{
-        BlendNode { operation:BlendMode::multiply,foreground: RgbaImage::default(), background: RgbaImage::default(), buffer: RgbaImage::default(), buffered: false }
+        BlendNode { operation:BlendMode::multiply,foreground: Arc::new(DynamicImage::default()), background: Arc::new(DynamicImage::default()), buffer: Arc::new(DynamicImage::default()), buffered: false }
     }
 
 
@@ -48,12 +48,12 @@ impl NodeStatic for BlendNode{
         presetValues.push("linear dodge".to_string());
         presetValues.push("linear burn".to_string());
         vec![NodeInputOptions{name:"mode".to_string(),IOType: NodeIOType::IntType(0),canAlterDefault:true,hasConnection:false,presetValues:Some(presetValues),subtype:None},
-            NodeInputOptions{name:"foreground".to_string(),IOType:NodeIOType::BitmapType(RgbaImage::default()),canAlterDefault:false,hasConnection:true,presetValues:None,subtype:None},
-            NodeInputOptions{name:"background".to_string(),IOType:NodeIOType::BitmapType(RgbaImage::default()),canAlterDefault:false,hasConnection:true,presetValues:None,subtype:None},]
+            NodeInputOptions{name:"foreground".to_string(),IOType:NodeIOType::DynamicImageType(Arc::new(DynamicImage::default())),canAlterDefault:false,hasConnection:true,presetValues:None,subtype:None},
+            NodeInputOptions{name:"background".to_string(),IOType:NodeIOType::DynamicImageType(Arc::new(DynamicImage::default())),canAlterDefault:false,hasConnection:true,presetValues:None,subtype:None},]
     }
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{
-        vec![NodeOutputOptions{name:"mixed".to_string(),IOType:NodeIOType::BitmapType(RgbaImage::default()),hasConnection:true}]
+        vec![NodeOutputOptions{name:"mixed".to_string(),IOType:NodeIOType::DynamicImageType(Arc::default()),hasConnection:true,subtype:None}]
     }
 
     fn get_node_name_static()->String {
@@ -65,10 +65,8 @@ impl Node for BlendNode{
     fn clear_buffers(&mut self) {
         *self = BlendNode::new();
     }
-    fn clear_inputs(&mut self) {
-        self.background = RgbaImage::default();
-        self.foreground = RgbaImage::default();
-    }
+
+    
     fn set(&mut self, index: u16, value: NodeIOType) -> NodeResult<()> {
         self.generate_input_errors(&index, &value)?;
         match index {
@@ -78,10 +76,10 @@ impl Node for BlendNode{
                     Err(_)=> return Err(NodeError::InvalidInput(Self::get_node_name_static(), value, index))
                 };
             }
-            1 => if let NodeIOType::BitmapType(image) = value{
+            1 => if let NodeIOType::DynamicImageType(image) = value{
                 self.foreground = image;
             }
-            2 => if let NodeIOType::BitmapType(image) = value{
+            2 => if let NodeIOType::DynamicImageType(image) = value{
                 self.background = image;
             }
             _ => ()
@@ -94,7 +92,9 @@ impl Node for BlendNode{
     fn get(&mut self, index: u16) -> NodeResult<NodeIOType> {
         self.generate_output_errors(&index)?;
         if !self.buffered {
-            self.buffer = RgbaImage::from_fn(std::cmp::max(self.foreground.width(),self.background.width()), std::cmp::max(self.foreground.height(),self.background.height()), |_x,_y| {Rgba([0,0,0,0])});
+            let background = self.background.to_rgba8();
+            let foreground = self.foreground.to_rgba8();
+            *Arc::get_mut(&mut self.buffer).unwrap() = DynamicImage::ImageRgba8(RgbaImage::from_fn(std::cmp::max(self.foreground.width(),self.background.width()), std::cmp::max(self.foreground.height(),self.background.height()), |_x,_y| {Rgba([0,0,0,0])}));
             match self.operation{
                 BlendMode::multiply=>{macro_utils::make_blend!(multiply_rgba_by_rgba);},
                 BlendMode::screen=>{macro_utils::make_blend!(screen_formula);},
@@ -109,6 +109,6 @@ impl Node for BlendNode{
         }
 
 
-        NodeResult::Ok(NodeIOType::BitmapType(self.buffer.clone()))
+        NodeResult::Ok(NodeIOType::DynamicImageType(self.buffer.clone()))
     }
 }

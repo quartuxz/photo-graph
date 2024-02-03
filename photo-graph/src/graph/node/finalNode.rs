@@ -5,23 +5,23 @@ use super::*;
 use image::{ImageBuffer};
 
 pub struct FinalNode{
-    bitmap : RgbaImage
+    image : Arc<DynamicImage>
 }
 
 impl FinalNode{
     pub fn new()->Self{
-        FinalNode { bitmap: RgbaImage::default() }
+        FinalNode { image: Arc::new(DynamicImage::default()) }
     }
 
 }
 
 impl NodeStatic for FinalNode{
     fn get_inputs_static()->Vec<NodeInputOptions>{
-        vec![NodeInputOptions{IOType:NodeIOType::BitmapType(return_non_empty(&RgbaImage::default())), canAlterDefault:false,hasConnection:true, name:"bitmap".to_string(), presetValues:None,subtype:None}]
+        vec![NodeInputOptions{IOType:NodeIOType::DynamicImageType(Arc::new(DynamicImage::ImageRgba8(return_non_empty(&RgbaImage::default())))), canAlterDefault:false,hasConnection:true, name:"image".to_string(), presetValues:None,subtype:None}]
     }
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{
-        vec![NodeOutputOptions{IOType:NodeIOType::BitmapType(RgbaImage::default()), hasConnection:false,name:"".to_string()}]
+        vec![NodeOutputOptions{IOType:NodeIOType::DynamicImageType(Arc::default()), hasConnection:false,name:"".to_string(),subtype:None}]
     }
 
     fn get_node_name_static()->String {
@@ -34,25 +34,21 @@ impl Node for FinalNode{
     fn clear_buffers(&mut self) {
         *self=FinalNode::new();
     }
-
-    fn clear_inputs(&mut self) {
-        self.bitmap = RgbaImage::default();
-    }
+    
 
     fn get(&mut self, index: u16) -> NodeResult<NodeIOType> {
         self.generate_output_errors(&index)?;
-        if self.bitmap.is_empty(){
-            
-            return NodeResult::Ok(NodeIOType::BitmapType(return_non_empty(&RgbaImage::default())));
+        if self.image.to_rgba8().is_empty(){
+            self.image = Arc::new(DynamicImage::ImageRgba8(return_non_empty(&RgbaImage::default())));
         }
-        NodeResult::Ok(NodeIOType::BitmapType(self.bitmap.clone()))
+        NodeResult::Ok(NodeIOType::DynamicImageType(self.image.clone()))
     }
     fn set(&mut self, index: u16, value:NodeIOType) -> NodeResult<()> {
 
         self.generate_input_errors(&index, &value)?;
 
-        if let NodeIOType::BitmapType(bitmap) = value{
-            self.bitmap = bitmap
+        if let NodeIOType::DynamicImageType(image) = value{
+            self.image = image
         }
 
         NodeResult::Ok(())

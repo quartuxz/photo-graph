@@ -344,7 +344,13 @@ async fn process_graph(request: HttpRequest, data: web::Data<AppState>)-> impl R
     let cachedGraphArc = match load_cached_graph(&claim, &data).await{Ok(val)=>val,Err(_)=>return HttpResponse::Unauthorized().into()};
     let mut cachedGraph = cachedGraphArc.lock().unwrap();
 
-    let outputImage = match cachedGraph.process(){Ok(val)=>val,Err(_)=>return HttpResponse::BadRequest().into()};
+    let outputImage = match cachedGraph.process(){Ok(val)=>val,Err(err)=>{
+        println!("processing error: {}", err.to_string());
+        if let graph::GraphError::NError(nodeError) = &err{
+            println!("\tnode error: {}",nodeError.to_string());
+        }
+        return HttpResponse::BadRequest().body(err.to_string()).into()
+    }};
     let mut bytes: Vec<u8> = Vec::new();
     outputImage.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png).unwrap();
     HttpResponse::Ok().content_type("image/png").body(bytes)
@@ -403,6 +409,10 @@ async fn retrieve_node_templates()->impl Responder{
     descriptors.push(graph::node::rotationNode::RotationNode::get_node_descriptor());
     descriptors.push(graph::node::resizeNode::ResizeNode::get_node_descriptor());
     descriptors.push(graph::node::scaleNode::ScaleNode::get_node_descriptor());
+    descriptors.push(graph::node::lumaToGrayscaleNode::LumaToGrayscaleNode::get_node_descriptor());
+    descriptors.push(graph::node::overlayWithMaskNode::OverlayWithMaskNode::get_node_descriptor());
+    descriptors.push(graph::node::separateRGBANode::SeparateRGBANode::get_node_descriptor());
+    descriptors.push(graph::node::invertNode::InvertNode::get_node_descriptor());
     HttpResponse::Ok().content_type("application/json").body(serde_json::to_string(&descriptors).unwrap())
 }
 

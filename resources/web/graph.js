@@ -41,15 +41,17 @@ class NodeIO{
     
     static #chooseCircleStyle(IOType){
       if(IOType == "int"){
-        return "rgb(150,200,150)";
+        return "rgb(150,220,150)";
       }else if(IOType == "color"){
-        return "rgb(200,200,150)";
+        return "rgb(220,220,150)";
       }else if(IOType == "float"){
-        return "rgb(150,200,200)";
+        return "rgb(150,220,220)";
       }else if(IOType == "string"){
-        return "rgb(200,150,150)";
-      }else if(IOType== "bitmap"){
+        return "rgb(220,150,150)";
+      }else if(IOType== "dynamic"){
         return "rgb(150,150,200)";
+      }else if(IOType== "luma"){
+        return "rgb(100,100,100)";
       }
     }
   
@@ -459,7 +461,8 @@ class NodeIO{
               let node = this.#nodes[this.getNodeIndex(Number(command.args[1]))];
               let defaultNodeID = Number(command.args[0]);
               switch(node.template.inputNodes[defaultNodeID-node.id-1].IOType){
-                case "int": parameters.push(Number(command.args[2])); break;
+                case "luma":
+                case "int":
                 case "float": parameters.push(Number(command.args[2])); break;
                 case "string": parameters.push(command.args[2]); break;
                 case "color": parameters = [Number(command.args[2]),Number(command.args[3]),Number(command.args[4]),Number(command.args[5])]; break;

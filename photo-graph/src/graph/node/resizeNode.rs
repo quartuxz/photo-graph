@@ -9,10 +9,10 @@ enum ResizeMode{
 
 pub struct ResizeNode{
     mode: ResizeMode,
-    resizing : RgbaImage,
+    resizing : Arc<DynamicImage>,
     x : f64,
     y: f64,
-    buffer : RgbaImage,
+    buffer : Arc<DynamicImage>,
     buffered:bool
 }
 
@@ -20,7 +20,7 @@ pub struct ResizeNode{
 
 impl ResizeNode{
     pub fn new()->Self{
-        ResizeNode { mode:ResizeMode::clamp,resizing : RgbaImage::default(),x:0.0,y:0.0, buffer: RgbaImage::default(), buffered: false }
+        ResizeNode { mode:ResizeMode::clamp,resizing : Arc::new(DynamicImage::default()),x:0.0,y:0.0, buffer: Arc::new(DynamicImage::default()), buffered: false }
     }
 
 
@@ -34,13 +34,13 @@ impl NodeStatic for ResizeNode{
         presetValues.push("clamp".to_string());
         presetValues.push("resize".to_string());
         vec![NodeInputOptions{name:"mode".to_string(),IOType:NodeIOType::IntType(0),canAlterDefault:true,hasConnection:false,presetValues:Some(presetValues),subtype:None},
-            NodeInputOptions{name:"resizing".to_string(),IOType:NodeIOType::BitmapType(RgbaImage::default()),canAlterDefault:false,hasConnection:true,presetValues:None,subtype:None},
+            NodeInputOptions{name:"resizing".to_string(),IOType:NodeIOType::DynamicImageType(Arc::new(DynamicImage::default())),canAlterDefault:false,hasConnection:true,presetValues:None,subtype:None},
             NodeInputOptions{name:"x".to_string(),IOType:NodeIOType::FloatType(0.0),canAlterDefault:true,hasConnection:true,presetValues:None,subtype:None},
             NodeInputOptions{name:"y".to_string(),IOType:NodeIOType::FloatType(0.0),canAlterDefault:true,hasConnection:true,presetValues:None,subtype:None},]
     }
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{
-        vec![NodeOutputOptions{name:"resized".to_string(),IOType:NodeIOType::BitmapType(RgbaImage::default()),hasConnection:true}]
+        vec![NodeOutputOptions{name:"resized".to_string(),IOType:NodeIOType::DynamicImageType(Arc::default()),hasConnection:true,subtype:None}]
     }
 
     fn get_node_name_static()->String {
@@ -53,9 +53,6 @@ impl Node for ResizeNode{
         *self = ResizeNode::new();
     }
 
-    fn clear_inputs(&mut self) {
-        self.resizing = RgbaImage::default();
-    }
 
     fn set(&mut self, index: u16, value: NodeIOType) -> NodeResult<()> {
         self.generate_input_errors(&index, &value)?;
@@ -66,7 +63,7 @@ impl Node for ResizeNode{
                     Err(_)=> return Err(NodeError::InvalidInput(Self::get_node_name_static(), value, index))
                 };
             }
-            1 => if let NodeIOType::BitmapType(image) = value{
+            1 => if let NodeIOType::DynamicImageType(image) = value{
                 self.resizing = image;
             }
             2 => if let NodeIOType::FloatType(x) = value{
@@ -90,6 +87,7 @@ impl Node for ResizeNode{
             let roundedX = self.x.round() as i32;
             let roundedY = self.y.round() as i32;
 
+            let resizing = self.resizing.to_rgba8();
             match self.mode{
                 //clamps thhe size based on non-transparent pixels, the new size is equal to the bounds of the non-transparent image + xy
                 ResizeMode::clamp=>{
@@ -99,7 +97,7 @@ impl Node for ResizeNode{
                     let mut maxY = u32::MIN;
 
 
-                    for (x,y,pix) in self.resizing.enumerate_pixels(){
+                    for (x,y,pix) in resizing.enumerate_pixels(){
                         if(pix.0[3] != 0){
                             minX = if x <  minX {x}else{minX};
                             maxX = if x >  maxX {x}else{maxX};
@@ -108,17 +106,17 @@ impl Node for ResizeNode{
                         }
 
                     }
-                    self.buffer = RgbaImage::from_fn(((maxX-minX) as i32 +roundedX) as u32, ((maxY-minY) as i32 +roundedY) as u32, |x,y|{
+                    *Arc::get_mut(&mut self.buffer).unwrap() = DynamicImage::ImageRgba8(RgbaImage::from_fn(((maxX-minX) as i32 +roundedX) as u32, ((maxY-minY) as i32 +roundedY) as u32, |x,y|{
                         let ax = x+minX;
                         let ay = y+minY;
-                        self.resizing.get_pixel_checked(ax, ay).unwrap_or(&Rgba([0,0,0,0])).clone()
-                    })
+                        resizing.get_pixel_checked(ax, ay).unwrap_or(&Rgba([0,0,0,0])).clone()
+                    }))
                 },
                 //resizes the image, filling the new space with transparency
                 ResizeMode::resize=>{
-                    self.buffer = RgbaImage::from_fn((self.resizing.width() as i32 +roundedX) as u32, (self.resizing.height() as i32 +roundedY) as u32, |x,y|{
-                        self.resizing.get_pixel_checked(x, y).unwrap_or(&Rgba([0,0,0,0])).clone()
-                    })
+                    *Arc::get_mut(&mut self.buffer).unwrap() =  DynamicImage::ImageRgba8(RgbaImage::from_fn((self.resizing.width() as i32 +roundedX) as u32, (self.resizing.height() as i32 +roundedY) as u32, |x,y|{
+                        resizing.get_pixel_checked(x, y).unwrap_or(&Rgba([0,0,0,0])).clone()
+                    }))
                 },
 
             }
@@ -128,6 +126,6 @@ impl Node for ResizeNode{
         }
 
 
-        NodeResult::Ok(NodeIOType::BitmapType(self.buffer.clone()))
+        NodeResult::Ok(NodeIOType::DynamicImageType(self.buffer.clone()))
     }
 }

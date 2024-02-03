@@ -1,18 +1,25 @@
+use std::cmp;
+
 use image::{GenericImageView, Pixel, Rgba, RgbaImage};
 
 
 pub fn bilinear_interpolate(image:&RgbaImage,x:f64,y:f64)->Rgba<u8>{
 
+    if x<0.0 || y<0.0||x>image.width()as f64 || y > image.height()as f64{
+        return Rgba([0,0,0,0]);
+    }
 
     let mut four_near : [(&Rgba<u8>,(f64,f64));4] = [(&Rgba([0,0,0,0]),(0.0,0.0));4];
 
-    //locate  each of the four nearest pixel centers and store their color and position.
+    //locate each of the four nearest pixel centers and store their color and position.
     let mut i = 0;
     for yi in [-0.5,0.5]{
         for xi in [-0.5,0.5]{
             four_near[i].1.0 = x.round()+xi;
             four_near[i].1.1 = y.round()+yi;
-            four_near[i].0 = image.get_pixel_checked(four_near[i].1.0.floor() as u32, four_near[i].1.1.floor() as u32).unwrap_or(&Rgba([0,0,0,0]));
+            let xNear = four_near[i].1.0.floor() as u32;
+            let yNear = four_near[i].1.1.floor() as u32;
+            four_near[i].0 = image.get_pixel_checked(xNear, yNear).unwrap_or(image.get_pixel(cmp::min(cmp::max(xNear,image.width()-1),0), cmp::min(cmp::max(yNear,image.height()-1),0)));
             i+=1;
         }
     }

@@ -1,43 +1,44 @@
-use super::*;
-use image::{ImageBuffer};
+use image::*;
 
-pub struct ColorToImageNode{
-    color: Rgba<u8>,
+use super::*;
+
+pub struct LumaToGrayscaleNode{
+    luma: Luma<u8>,
     width: u32,
     height:u32,
     buffered: bool,
     buffer : Arc<DynamicImage>
 }
 
-impl ColorToImageNode{
+impl LumaToGrayscaleNode{
     pub fn new()->Self{
-        ColorToImageNode { color: Rgba([100,100,100,255]),width:500,height:500, buffered: false, buffer: Arc::new(DynamicImage::default()) }
+        LumaToGrayscaleNode { luma:Luma([255]),width:500,height:500, buffered: false, buffer: Arc::new(DynamicImage::default()) }
     }
 
 }
 
-impl NodeStatic for ColorToImageNode{
+impl NodeStatic for LumaToGrayscaleNode{
 
     fn get_inputs_static()->Vec<NodeInputOptions>{
-        vec![NodeInputOptions{IOType:NodeIOType::ColorType(Rgba([100,100,100,255])), canAlterDefault:true,hasConnection:true, name:"color".to_string(), presetValues:None,subtype:None},
+        vec![NodeInputOptions{IOType:NodeIOType::LumaType(Luma([255])), canAlterDefault:true,hasConnection:true, name:"luma".to_string(), presetValues:None,subtype:None},
             NodeInputOptions{IOType:NodeIOType::FloatType(500.0), canAlterDefault:true,hasConnection:true, name:"width".to_string(), presetValues:None,subtype:None},
             NodeInputOptions{IOType:NodeIOType::FloatType(500.0), canAlterDefault:true,hasConnection:true, name:"height".to_string(), presetValues:None,subtype:None}]
     }
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{
-        vec![NodeOutputOptions{IOType:NodeIOType::DynamicImageType(Arc::default()), hasConnection:true, name:"bitmap".to_string(),subtype:None}]
+        vec![NodeOutputOptions{IOType:NodeIOType::DynamicImageType(Arc::default()), hasConnection:true, name:"grayscale".to_string(),subtype:Some(NodeIOSubtypes::GrayscaleImage)}]
     }
 
     fn get_node_name_static()->String{
-        "Color to image".to_string()
+        "Luma to grayscale".to_string()
     }
 }
 
-impl Node for ColorToImageNode{
+impl Node for LumaToGrayscaleNode{
 
 
     fn clear_buffers(&mut self) {
-        *self = ColorToImageNode::new();
+        *self = LumaToGrayscaleNode::new();
     }
 
 
@@ -45,8 +46,8 @@ impl Node for ColorToImageNode{
     fn set(&mut self, index: u16, value: NodeIOType) -> NodeResult<()> {
         self.generate_input_errors(&index, &value)?;
         match index {
-            0 => if let NodeIOType::ColorType(color) = value{
-                self.color = color;
+            0 => if let NodeIOType::LumaType(luma) = value{
+                self.luma = luma;
             }
             1 => if let NodeIOType::FloatType(mut float) = value{
                 if float < 1.0 {
@@ -70,7 +71,7 @@ impl Node for ColorToImageNode{
     fn get(&mut self, index: u16) -> NodeResult<NodeIOType> {
         self.generate_output_errors(&index)?;
         if !self.buffered {
-            *Arc::get_mut(&mut self.buffer).unwrap() = DynamicImage::ImageRgba8(ImageBuffer::from_fn(self.width, self.height, |_x,_y| {self.color}));
+            *Arc::get_mut(&mut self.buffer).unwrap() = DynamicImage::ImageLuma8(ImageBuffer::from_fn(self.width, self.height, |_x,_y| {self.luma}));
             self.buffered =true;
         }
 

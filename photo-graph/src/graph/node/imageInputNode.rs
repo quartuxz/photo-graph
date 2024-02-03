@@ -6,7 +6,7 @@ use image::DynamicImage;
 pub struct ImageInputNode{
     filename : String,
     buffered: bool,
-    buffer : RgbaImage,
+    buffer : Arc<DynamicImage>,
     username: String
 }
 
@@ -19,15 +19,15 @@ impl ImageInputNode{
             finalFile="dummy.png".to_owned();
         }
         if finalFile != "dummy.png"{
-            self.buffer = match image::open(PathBuf::from_iter([crate::util::RESOURCE_PATH.clone(),"images".to_owned(),crate::util::sanitize(&self.username,true), finalFile.clone()])){Ok(val)=>val,Err(_)=>return Err(NodeError::IOError(Self::get_node_name_static()))}.into_rgba8();
+            *Arc::get_mut(&mut self.buffer).unwrap() = match image::open(PathBuf::from_iter([crate::util::RESOURCE_PATH.clone(),"images".to_owned(),crate::util::sanitize(&self.username,true), finalFile.clone()])){Ok(val)=>val,Err(_)=>return Err(NodeError::IOError(Self::get_node_name_static()))};
         }else{
-            self.buffer = match image::open(PathBuf::from_iter([crate::util::RESOURCE_PATH.clone(),"web".to_owned(),finalFile])){Ok(val)=>val,Err(_)=>return Err(NodeError::IOError(Self::get_node_name_static()))}.into_rgba8();
+            *Arc::get_mut(&mut self.buffer).unwrap() = match image::open(PathBuf::from_iter([crate::util::RESOURCE_PATH.clone(),"web".to_owned(),finalFile])){Ok(val)=>val,Err(_)=>return Err(NodeError::IOError(Self::get_node_name_static()))};
         }
 
         Ok(())
     }
     pub fn new(username:String)->Self{
-        ImageInputNode { filename: String::default(), buffered: false, buffer: RgbaImage::default(), username }
+        ImageInputNode { filename: String::default(), buffered: false, buffer: Arc::new(DynamicImage::default()), username }
     }
 
 }
@@ -39,7 +39,7 @@ impl NodeStatic for ImageInputNode{
     }
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{
-        vec![NodeOutputOptions{IOType:NodeIOType::BitmapType(RgbaImage::default()), hasConnection:true, name:"bitmap".to_string()}]
+        vec![NodeOutputOptions{IOType:NodeIOType::DynamicImageType(Arc::default()), hasConnection:true, name:"bitmap".to_string(),subtype:None}]
     }
 
     fn get_node_name_static()->String{
@@ -73,6 +73,6 @@ impl Node for ImageInputNode{
         }
 
 
-        NodeResult::Ok(NodeIOType::BitmapType(self.buffer.clone()))
+        NodeResult::Ok(NodeIOType::DynamicImageType(self.buffer.clone()))
     }
 }

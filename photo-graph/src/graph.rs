@@ -6,7 +6,7 @@ use std::{cell::RefCell, collections::HashMap, fmt, num::ParseIntError, str::Fro
 use crate::graph::node::{NodeStatic};
 
 use self::node::{Node, NodeError, NodeIOType, NodeInputOptions};
-use image::RgbaImage;
+use image::{Luma, RgbaImage};
 
 
 //the output node is the node that is connected as a supplier of the edge(supplier as in data flows out of the node)
@@ -187,11 +187,9 @@ impl Graph{
             for edge in self.get_edges_connnected_to(0){
                 if edge.0 == layer {
                     //we roll through the nodes that have already been processes and whose result is already used.
-                    //Clearing buffers or inputs.
+                    //Clearing buffers.
                     if self.lowMemoryMode{
                         self.nodes.get_mut(&edge.1.outputNode).unwrap().clear_buffers();
-                    }else{
-                        self.nodes.get_mut(&edge.1.outputNode).unwrap().clear_inputs();
                     }
 
                 }
@@ -201,20 +199,16 @@ impl Graph{
 
 
         
-        if let node::NodeIOType::BitmapType(bitmap) =self.nodes.get_mut(&0).unwrap().get(0)?{
+        if let node::NodeIOType::DynamicImageType(bitmap) =self.nodes.get_mut(&0).unwrap().get(0)?{
             self.changedNodes.clear();
             //if we are in low memory mode, we clear all buffers as we wont be using them for optimized performance
             if self.lowMemoryMode{
                 for node in &mut self.nodes{
                     node.1.clear_buffers();
                 }
-            }else{//otherwise we just clear the inputs on the nodes, as they get repopulated in the next processing round.
-                for node in &mut self.nodes{
-                    node.1.clear_inputs();
-                }
             }
 
-            Ok(bitmap)
+            Ok((*bitmap).to_rgba8())
         }else{
             panic!();
         }
@@ -402,8 +396,9 @@ impl Graph{
         for input in inputs{
             let defNodeKey = self.IDCount+index+1;
             let defNode:Box<dyn Node> = match input{
-                NodeInputOptions {IOType:NodeIOType::BitmapType(bitmap),..} => Box::new(node::bitmapLiteralNode::BitmapLiteralNode::new(bitmap)),
+                NodeInputOptions {IOType:NodeIOType::DynamicImageType(image),..} => Box::new(node::dynamicImageLiteralNode::DynamicImageLiteralNode::new((*image).clone())),
                 NodeInputOptions {IOType:NodeIOType::ColorType(color),..} => Box::new(node::colorLiteralNode::ColorLiteralNode::new(color)),
+                NodeInputOptions {IOType:NodeIOType::LumaType(luma),..} => Box::new(node::lumaLiteralNode::LumaLiteralNode::new(luma)),
                 NodeInputOptions {IOType:NodeIOType::FloatType(floatLiteral),..} => Box::new(node::floatLiteralNode::FloatLiteralNode::new(floatLiteral)),
                 NodeInputOptions {IOType:NodeIOType::IntType(intLiteral),..} => Box::new(node::intLiteralNode::IntLiteralNode::new(intLiteral)),
                 NodeInputOptions {IOType:NodeIOType::StringType(stringLiteral),..} => Box::new(node::stringLiteralNode::StringLiteralNode::new(stringLiteral))
@@ -447,6 +442,14 @@ impl Graph{
                         self.add_node(Box::new(node::resizeNode::ResizeNode::new()));
                     }else if cmd.args[0] == node::scaleNode::ScaleNode::get_node_name_static(){
                         self.add_node(Box::new(node::scaleNode::ScaleNode::new()));
+                    }else if cmd.args[0] == node::lumaToGrayscaleNode::LumaToGrayscaleNode::get_node_name_static(){
+                        self.add_node(Box::new(node::lumaToGrayscaleNode::LumaToGrayscaleNode::new()));
+                    }else if cmd.args[0] == node::overlayWithMaskNode::OverlayWithMaskNode::get_node_name_static(){
+                        self.add_node(Box::new(node::overlayWithMaskNode::OverlayWithMaskNode::new()));
+                    }else if cmd.args[0] == node::separateRGBANode::SeparateRGBANode::get_node_name_static(){
+                        self.add_node(Box::new(node::separateRGBANode::SeparateRGBANode::new()));
+                    }else if cmd.args[0] == node::invertNode::InvertNode::get_node_name_static(){
+                        self.add_node(Box::new(node::invertNode::InvertNode::new()));
                     }
                     }
                 "removeNode" =>{if cmd.args.len() < 1{return Err(GraphError::IllFormedCommand)} self.remove_node(cmd.args[0].parse()?,true)?},
@@ -465,6 +468,11 @@ impl Graph{
                         else if nodeName == node::intLiteralNode::IntLiteralNode::get_node_name_static(){
                             self.nodes.insert(nodeID, Box::new(node::intLiteralNode::IntLiteralNode::new(match cmd.args[2].parse(){
                                 Ok(parsed) => parsed,
+                                Err(_) => return Err(GraphError::IllFormedCommand)
+                            })));
+                        }else if nodeName == node::lumaLiteralNode::LumaLiteralNode::get_node_name_static(){
+                            self.nodes.insert(nodeID, Box::new(node::lumaLiteralNode::LumaLiteralNode::new(match cmd.args[2].parse(){
+                                Ok(parsed) => Luma([parsed]),
                                 Err(_) => return Err(GraphError::IllFormedCommand)
                             })));
                         }

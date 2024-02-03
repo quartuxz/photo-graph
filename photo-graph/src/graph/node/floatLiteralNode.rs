@@ -16,7 +16,7 @@ impl FloatLiteralNode{
 
 impl NodeStatic for FloatLiteralNode{
     fn get_outputs_static()->Vec<NodeOutputOptions>{
-        vec![NodeOutputOptions{IOType:NodeIOType::FloatType(f64::default()), hasConnection:true, name:"".to_string()}]
+        vec![NodeOutputOptions{IOType:NodeIOType::FloatType(f64::default()), hasConnection:true, name:"".to_string(),subtype:None}]
     }
 
     fn get_node_name_static()->String where Self:Sized {

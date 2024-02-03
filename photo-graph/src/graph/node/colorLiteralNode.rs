@@ -16,7 +16,7 @@ impl ColorLiteralNode{
 impl NodeStatic for ColorLiteralNode{
 
     fn get_outputs_static()->Vec<NodeOutputOptions>{
-        vec![NodeOutputOptions{IOType:NodeIOType::ColorType(Rgba([255,255,255,255])), hasConnection:true, name:"".to_string()}]
+        vec![NodeOutputOptions{IOType:NodeIOType::ColorType(Rgba([255,255,255,255])), hasConnection:true, name:"".to_string(),subtype:None}]
     }
     
     fn get_node_name_static()->String {

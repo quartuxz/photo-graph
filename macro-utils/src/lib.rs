@@ -48,9 +48,9 @@ pub fn derive_TryFrom(input: TokenStream) -> TokenStream {
 pub fn make_blend(input: TokenStream) -> TokenStream{
     let func:proc_macro2::TokenStream = input.into();
     let output = quote!(
-        self.buffer.enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-        let mut fpix = match self.foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-        let mut bpix = match self.background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
+        Arc::get_mut(&mut self.buffer).unwrap().as_mut_rgba8().unwrap().enumerate_pixels_mut().for_each(|(x,y,pixel)|{
+        let mut fpix = match foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
+        let mut bpix = match background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
 
         
         *pixel = blend(&fpix, &bpix, #func);

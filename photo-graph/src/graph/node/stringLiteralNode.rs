@@ -16,7 +16,7 @@ impl StringLiteralNode{
 
 impl NodeStatic for StringLiteralNode{
     fn get_outputs_static()->Vec<NodeOutputOptions>{
-        vec![NodeOutputOptions{IOType:NodeIOType::StringType(String::default()), hasConnection:true, name:"".to_string()}]
+        vec![NodeOutputOptions{IOType:NodeIOType::StringType(String::default()), hasConnection:true, name:"".to_string(),subtype:None}]
     }
     fn get_node_name_static()->String {
         "String literal".to_string()
