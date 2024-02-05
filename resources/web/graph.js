@@ -164,6 +164,7 @@ class NodeIO{
             ele.type = "input";
             ele.node = this;
             ele.IOSocket = transformed.inputCircles[i].socketID;
+            ele.visibleSocket = i;
             return ele;
           }
         }
@@ -173,6 +174,7 @@ class NodeIO{
             ele.type = "output";
             ele.node = this;
             ele.IOSocket = transformed.outputCircles[i].socketID;
+            ele.visibleSocket = i;
             return ele;
           }
         }

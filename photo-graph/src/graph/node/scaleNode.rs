@@ -1,4 +1,4 @@
-use crate::image_utils::bilinear_interpolate;
+use crate::image_utils::{bilinear_interpolate, color_f32_to_u8};
 
 use super::*;
 
@@ -108,7 +108,7 @@ impl Node for ScaleNode{
                 ScaleMode::precise => *Arc::get_mut(&mut self.buffer).unwrap() = DynamicImage::ImageRgba8(RgbaImage::from_fn((self.scaling.width() as f64*self.x).ceil() as u32, (self.scaling.height() as f64*self.y).ceil() as u32, |x,y|{
                     let ax = (x as f64+0.5) * self.x.recip();
                     let ay = (y as f64+0.5) * self.y.recip();
-                    bilinear_interpolate(&scaling, ax, ay)
+                    color_f32_to_u8(&bilinear_interpolate(&scaling, ax, ay))
                 }))
             }
             

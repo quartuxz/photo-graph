@@ -466,9 +466,9 @@ class UI{
           if(this.selecting.type == "output" || this.selecting.type == "input"){
             let from = null;
             if(this.selecting.type == "output"){
-              from = this.selecting.node.getObjectTransformed().outputCircles[this.selecting.IOSocket].center;
+              from = this.selecting.node.getObjectTransformed().outputCircles[this.selecting.visibleSocket].center;
             }else{
-              from = this.selecting.node.getObjectTransformed().inputCircles[this.selecting.IOSocket].center;
+              from = this.selecting.node.getObjectTransformed().inputCircles[this.selecting.visibleSocket].center;
             }
             this.drawLine = () => {            
               let to = this.graph.getTransformedPos(mousePos);

@@ -2,7 +2,7 @@ use std::cmp;
 
 use image::GenericImageView;
 
-use crate::image_utils::bilinear_interpolate;
+use crate::image_utils::{bilinear_interpolate, color_f32_to_u8};
 
 use super::*;
 
@@ -107,7 +107,7 @@ impl Node for MoveNode{
                         let imageX = x as f64 +0.5 - self.x;
                         let imageY = y as f64 +0.5 - self.y;
                         
-                        bilinear_interpolate(&moving, imageX, imageY)
+                        color_f32_to_u8(&bilinear_interpolate(&moving, imageX, imageY))
                     
                     }));
                 },
@@ -122,7 +122,7 @@ impl Node for MoveNode{
                     |x,y|{
                         let imageX = x as f64 +0.5 - self.x;
                         let imageY = y as f64 +0.5 - self.y;
-                        bilinear_interpolate(&moving, imageX, imageY)
+                        color_f32_to_u8(&bilinear_interpolate(&moving, imageX, imageY))
                     
                     }));
                 },
@@ -132,7 +132,7 @@ impl Node for MoveNode{
                         let imageX = (x as f64+0.5 - self.x).rem_euclid(self.moving.width()as f64) ;
                         let imageY = (y as f64+0.5 - self.y).rem_euclid(self.moving.height()as f64) ;
                         
-                        bilinear_interpolate(&moving, imageX, imageY)
+                        color_f32_to_u8(&bilinear_interpolate(&moving, imageX, imageY))
                     
                     }));
                 }

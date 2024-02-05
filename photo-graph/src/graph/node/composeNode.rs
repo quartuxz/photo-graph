@@ -95,68 +95,70 @@ impl Node for ComposeNode{
             *Arc::get_mut(&mut self.buffer).unwrap() = DynamicImage::ImageRgba8(RgbaImage::from_fn(std::cmp::max(self.foreground.width(),self.background.width()), std::cmp::max(self.foreground.height(),self.background.height()), |_x,_y| {Rgba([0,0,0,0])}));
             match self.operation{
                 CompositionType::mask => {Arc::get_mut(&mut self.buffer).unwrap().as_mut_rgba8().unwrap().enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-                    let mut fpix = match foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let bpix = match background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let falpha = normalized(fpix.0[3]);
-                    let balpha = normalized(bpix.0[3]);
+                    let mut fpix = color_u8_to_f32(match foreground.get_pixel_checked(x, y){Some(val)=>val,None=>&Rgba([0,0,0,0])});
+                    let bpix = color_u8_to_f32(match background.get_pixel_checked(x, y){Some(val)=>val,None=>&Rgba([0,0,0,0])});
+                    let falpha = fpix.0[3];
+                    let balpha = bpix.0[3];
                     //premultiply
                     fpix = get_relative_color(&fpix, falpha);
 
-                    *pixel = multiply_color(&fpix, balpha);
+                    let result = multiply_color(&fpix, balpha);
+                    *pixel = color_f32_to_u8(&get_relative_color(&result, 1.0/result.0[3]));
                     
                 });},
                 CompositionType::overlay => {Arc::get_mut(&mut self.buffer).unwrap().as_mut_rgba8().unwrap().enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-                    let mut fpix = match foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let mut bpix = match background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let falpha = normalized(fpix.0[3]);
-                    let balpha = normalized(bpix.0[3]);
+                    let mut fpix = color_u8_to_f32(match foreground.get_pixel_checked(x, y){Some(val)=>val,None=>&Rgba([0,0,0,0])});
+                    let mut bpix = color_u8_to_f32(match background.get_pixel_checked(x, y){Some(val)=>val,None=>&Rgba([0,0,0,0])});
+                    let falpha = fpix.0[3];
+                    let balpha = bpix.0[3];
                     //premultiply
                     fpix = get_relative_color(&fpix, falpha);
                     bpix = get_relative_color(&bpix, balpha);
 
                     bpix = multiply_color(&bpix, 1.0-falpha);
-                    *pixel = saturating_add_rgba(&fpix, &bpix);
+
+                    let result = saturating_add_rgba(&fpix, &bpix);
+                    *pixel = color_f32_to_u8(&get_relative_color(&result, 1.0/result.0[3]));
                 });},
                 CompositionType::inverseMask => {Arc::get_mut(&mut self.buffer).unwrap().as_mut_rgba8().unwrap().enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-                    let fpix = match foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let mut bpix = match background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let falpha = normalized(fpix.0[3]);
-                    let balpha = normalized(bpix.0[3]);
+                    let mut fpix = color_u8_to_f32(match foreground.get_pixel_checked(x, y){Some(val)=>val,None=>&Rgba([0,0,0,0])});
+                    let mut bpix = color_u8_to_f32(match background.get_pixel_checked(x, y){Some(val)=>val,None=>&Rgba([0,0,0,0])});
+                    let falpha = fpix.0[3];
+                    let balpha = bpix.0[3];
                     //premultiply
                     bpix = get_relative_color(&bpix, balpha);
 
-                    *pixel = multiply_color(&bpix, 1.0-falpha);
+                    let result = multiply_color(&bpix, 1.0-falpha);
+                    *pixel = color_f32_to_u8(&get_relative_color(&result, 1.0/result.0[3]));
 
                 });},
                 CompositionType::atop=>{Arc::get_mut(&mut self.buffer).unwrap().as_mut_rgba8().unwrap().enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-                    //source
-                    let mut fpix = match foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    //destination
-                    let mut bpix = match background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let falpha = normalized(fpix.0[3]);
-                    let balpha = normalized(bpix.0[3]);
+                    let mut fpix = color_u8_to_f32(match foreground.get_pixel_checked(x, y){Some(val)=>val,None=>&Rgba([0,0,0,0])});
+                    let mut bpix = color_u8_to_f32(match background.get_pixel_checked(x, y){Some(val)=>val,None=>&Rgba([0,0,0,0])});
+                    let falpha = fpix.0[3];
+                    let balpha = bpix.0[3];
                     //premultiply
                     fpix = get_relative_color(&fpix, falpha);
                     bpix = get_relative_color(&bpix, balpha);
                     
                     fpix = multiply_color(&fpix, balpha);
                     bpix = multiply_color(&bpix, 1.0-falpha);
-                    *pixel = saturating_add_rgba(&fpix, &bpix);
+                    let result = saturating_add_rgba(&fpix, &bpix);
+                    *pixel = color_f32_to_u8(&get_relative_color(&result, 1.0/result.0[3]));
                 });},
                 CompositionType::neither=>{Arc::get_mut(&mut self.buffer).unwrap().as_mut_rgba8().unwrap().enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-                    //source
-                    let mut fpix = match foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    //destination
-                    let mut bpix = match background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                    let falpha = normalized(fpix.0[3]);
-                    let balpha = normalized(bpix.0[3]);
+                    let mut fpix = color_u8_to_f32(match foreground.get_pixel_checked(x, y){Some(val)=>val,None=>&Rgba([0,0,0,0])});
+                    let mut bpix = color_u8_to_f32(match background.get_pixel_checked(x, y){Some(val)=>val,None=>&Rgba([0,0,0,0])});
+                    let falpha = fpix.0[3];
+                    let balpha = bpix.0[3];
                     //premultiply
                     fpix = get_relative_color(&fpix, falpha);
                     bpix = get_relative_color(&bpix, balpha);
                     
                     fpix = multiply_color(&fpix, 1.0-balpha);
                     bpix = multiply_color(&bpix, 1.0-falpha);
-                    *pixel = saturating_add_rgba(&fpix, &bpix);
+                    let result = saturating_add_rgba(&fpix, &bpix);
+                    *pixel = color_f32_to_u8(&get_relative_color(&result, 1.0/result.0[3]));
                 });},
                 CompositionType::foreground=>{Arc::get_mut(&mut self.buffer).unwrap().as_mut_rgba8().unwrap().enumerate_pixels_mut().for_each(|(x,y,pixel)|{
                     //source

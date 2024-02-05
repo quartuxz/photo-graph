@@ -1,6 +1,6 @@
 use std::{cell::RefCell, cmp::Ordering, collections::HashMap, default, sync::Arc};
 
-use crate::image_utils::{bilinear_interpolate, multiply_color, saturating_add_rgba};
+use crate::image_utils::{bilinear_interpolate, color_f32_to_u8, multiply_color, saturating_add_rgba};
 
 use super::*;
 
@@ -117,7 +117,7 @@ impl Node for RotationNode{
                         rotX += halfWidth;
                         rotY += halfHeight;
                         
-                        bilinear_interpolate(&rotating, rotX, rotY)
+                        color_f32_to_u8(&bilinear_interpolate(&rotating, rotX, rotY))
                         
                     }));
                 }
@@ -143,7 +143,7 @@ impl Node for RotationNode{
                         rotX += halfWidth;
                         rotY += halfHeight;
                         
-                        bilinear_interpolate(&rotating, rotX, rotY)
+                        color_f32_to_u8(&bilinear_interpolate(&rotating, rotX, rotY))
                         
                     }));
                 }

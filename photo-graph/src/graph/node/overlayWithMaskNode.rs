@@ -75,10 +75,10 @@ impl Node for OverlayWithMaskNode{
             Arc::get_mut(&mut self.buffer).unwrap().as_mut_rgba8().unwrap().enumerate_pixels_mut().for_each(|(x,y,pixel)|{
                 let maskPix = normalized(mask.get_pixel_checked(x, y).unwrap_or(&Luma([0])).0[0]);
 
-                let mut tpix = match top.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                let mut bpix = match bottom.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-                let talpha = normalized(tpix.0[3]);
-                let balpha = normalized(bpix.0[3]);
+                let mut tpix = color_u8_to_f32(match top.get_pixel_checked(x, y){Some(val)=>val,None=>&Rgba([0,0,0,0])});
+                let mut bpix = color_u8_to_f32(match bottom.get_pixel_checked(x, y){Some(val)=>val,None=>&Rgba([0,0,0,0])});
+                let talpha = tpix.0[3];
+                let balpha = bpix.0[3];
                 //premultiply
                 tpix = get_relative_color(&tpix, talpha);
                 bpix = get_relative_color(&bpix, balpha);
@@ -86,7 +86,8 @@ impl Node for OverlayWithMaskNode{
 
                 tpix = multiply_color(&tpix, maskPix);
                 bpix = multiply_color(&bpix, 1.0-maskPix);
-                *pixel = saturating_add_rgba(&tpix, &bpix);
+                let result = saturating_add_rgba(&tpix, &bpix);
+                *pixel = color_f32_to_u8(&get_relative_color(&result, 1.0/result.0[3]));
             });
             self.buffered =true;
         }
