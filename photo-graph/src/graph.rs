@@ -540,13 +540,16 @@ mod tests{
     #[test]
     fn loop_check_test(){
         let mut graph = super::Graph::new("");
+        //2
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
+        //6
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
+        //10
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
-        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:2,outputNode:5}).unwrap();
-        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:5,outputNode:8}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:2,outputNode:6}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:6,outputNode:10}).unwrap();
 
-        let res = graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:8,outputNode:2});
+        let res = graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:10,outputNode:2});
         assert_eq!(res, Err(GraphError::Cycle));
 
         let mut graph = super::Graph::new("");
@@ -579,43 +582,43 @@ mod tests{
         let mut graph = super::Graph::new("");
         //2
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
-        //5
+        //6
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
-        //8
+        //10
         graph.add_node(Box::new(super::node::rotationNode::RotationNode::new()));
 
-        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:2,outputNode:5}).unwrap();
-        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:5,outputNode:8}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:2,outputNode:6}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:6,outputNode:10}).unwrap();
 
 
-        //11
+        //14
         graph.add_node(Box::new(ImageInputNode::new(graph.get_user())));
-        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:8,outputNode:11}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:10,outputNode:14}).unwrap();
 
 
-        //13
+        //16
         graph.add_node(Box::new(super::node::mathNode::MathNode::new()));
-        graph.add_edge(super::Edge{inputIndex:2, outputIndex:0, inputNode:8,outputNode:13}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:2, outputIndex:0, inputNode:10,outputNode:16}).unwrap();
 
-        //17
+        //20
         graph.add_node(Box::new(super::node::mathNode::MathNode::new()));
-        graph.add_edge(super::Edge{inputIndex:2, outputIndex:0, inputNode:5,outputNode:17}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:2, outputIndex:0, inputNode:6,outputNode:20}).unwrap();
 
-        //21
+        //24
         graph.add_node(Box::new(super::node::mathNode::MathNode::new()));
-        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:17,outputNode:21}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:20,outputNode:24}).unwrap();
 
-        //25
+        //28
         graph.add_node(Box::new(super::node::mathNode::MathNode::new()));
-        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:21,outputNode:25}).unwrap();
+        graph.add_edge(super::Edge{inputIndex:1, outputIndex:0, inputNode:24,outputNode:28}).unwrap();
         
         graph.add_edge(super::Edge{inputIndex:0,outputIndex:0,inputNode:0,outputNode:2}).unwrap();
         assert_eq!(graph.edges.last().unwrap().1, super::Edge{inputIndex:0,outputIndex:0,inputNode:0,outputNode:2});
         assert_eq!(graph.edges.last().unwrap().0, 5);
-        assert_eq!(graph.edges[graph.edges.iter().position(|elem| elem.1 == super::Edge{inputIndex:0, outputIndex:0, inputNode:5,outputNode:8}).unwrap()].0, 2);
-        assert_eq!(graph.edges[graph.edges.iter().position(|elem| elem.1 == super::Edge{inputIndex:1, outputIndex:0, inputNode:5,outputNode:17}).unwrap()].0, 3);
+        assert_eq!(graph.edges[graph.edges.iter().position(|elem| elem.1 == super::Edge{inputIndex:1, outputIndex:0, inputNode:6,outputNode:10}).unwrap()].0, 2);
+        assert_eq!(graph.edges[graph.edges.iter().position(|elem| elem.1 == super::Edge{inputIndex:2, outputIndex:0, inputNode:6,outputNode:20}).unwrap()].0, 3);
 
-        graph.remove_edge_and_replace_with_default(&super::Edge{inputIndex:2, outputIndex:0, inputNode:5,outputNode:17}, true).unwrap();
+        graph.remove_edge_and_replace_with_default(&super::Edge{inputIndex:2, outputIndex:0, inputNode:6,outputNode:20}, true).unwrap();
         assert_eq!(graph.edges.last().unwrap().0, 4);
         
     }
