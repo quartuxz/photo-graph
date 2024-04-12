@@ -176,3 +176,4 @@ impl Node for ComposeNode{
         NodeResult::Ok(NodeIOType::DynamicImageType(self.buffer.clone()))
     }
 }
+

@@ -26,7 +26,7 @@ pub fn bilinear_interpolate(image:&RgbaImage,x:f64,y:f64)->Rgba<f32>{
             four_near[i].1.1 = y.round()+yi;
             let xNear = four_near[i].1.0.floor() as u32;
             let yNear = four_near[i].1.1.floor() as u32;
-            let pix = image.get_pixel_checked(xNear, yNear).unwrap_or(image.get_pixel(cmp::min(cmp::max(xNear,image.width()-1),0), cmp::min(cmp::max(yNear,image.height()-1),0)));
+            let pix = image.get_pixel_checked(xNear, yNear).unwrap_or(image.get_pixel(cmp::max(cmp::min(xNear,image.width()-1),0), cmp::max(cmp::min(yNear,image.height()-1),0)));
             four_near[i].0 = color_u8_to_f32(&pix);
             i+=1;
         }

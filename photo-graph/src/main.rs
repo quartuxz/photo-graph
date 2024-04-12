@@ -375,6 +375,7 @@ async fn command_graph(request: HttpRequest, data: web::Data<AppState>, commands
     let cachedGraphArc = match load_cached_graph(&claim, &data).await{Ok(val)=>val,Err(_)=>return HttpResponse::Unauthorized().into()};
     let mut cachedGraph = cachedGraphArc.lock().unwrap();
 
+
     for command in &commands.commands{
         println!("{}",command);
     }
