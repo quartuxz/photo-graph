@@ -49,12 +49,12 @@ pub fn make_blend(input: TokenStream) -> TokenStream{
     let func:proc_macro2::TokenStream = input.into();
     let output = quote!(
         Arc::get_mut(&mut self.buffer).unwrap().as_mut_rgba8().unwrap().enumerate_pixels_mut().for_each(|(x,y,pixel)|{
-        let mut fpix = match foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
-        let mut bpix = match background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
+            let mut fpix = match foreground.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
+            let mut bpix = match background.get_pixel_checked(x, y){Some(val)=>val.clone(),None=>Rgba([0,0,0,0])};
 
-        
-        *pixel = blend(&fpix, &bpix, #func);
-        pixel.0[3] = fpix.0[3];
+            
+            *pixel = blend(&fpix, &bpix, #func);
+            pixel.0[3] = fpix.0[3];
     }););
     output.into()
 }
